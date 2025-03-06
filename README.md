@@ -115,7 +115,6 @@ kubectl port-forward svc/ec61850-simulator 8091:8091
 kubectl port-forward svc/ml-processing 8092:8092
 
 # Port forward SCADA Interface
-# Update with the specific ports you used
 kubectl port-forward svc/scada-interface 8093:8093
 
 
