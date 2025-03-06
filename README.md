@@ -70,52 +70,74 @@ The system consists of three main components:
 
 This setup runs on Azure Kubernetes Service (AKS) using the Azure CNI networking plugin. The components communicate within the cluster network and expose services externally as needed.
 
-# Create ArgoCD namespace
+```
 kubectl create namespace argocd
 
-# Install ArgoCD in the cluster
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-# Wait for ArgoCD server deployment to be available
 kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd
 
-# Apply ArgoCD project configuration
 kubectl apply -f argocd/projects/grid-station-project.yaml
 
-# Apply ArgoCD application configuration
 kubectl apply -f argocd/applications/grid-station-app.yaml
 
-# Apply ConfigMaps
 kubectl apply -f manifests/configmaps/
 
-# Apply Storage configurations
 kubectl apply -f manifests/storage/
 
-# Apply Networking configurations
 kubectl apply -f manifests/networking/
 
-# Deploy IEC 61850 Simulator with service configuration
 kubectl apply -f manifests/ec61850-simulator/
 
-# Deploy ML Processing components
 kubectl apply -f manifests/ml-processing/
 
-# Deploy SCADA Interface components
 kubectl apply -f manifests/scada-interface/
 
-# Port forward ArgoCD server (example - adjust port as needed)
-kubectl port-forward svc/argocd-server -n argocd 8080:443
+```
 
-# Port forward IEC 61850 Simulator
-# Update with the specific ports you used
-kubectl port-forward svc/ec61850-simulator 8091:8091
+# Advanced implementation of monitoring and generate data simulation installation
+```
+helm repo update
+kubectl create namespace monitoring
 
-# Port forward ML Processing service
-# Update with the specific ports you used
-kubectl port-forward svc/ml-processing 8092:8092
+helm install prometheus prometheus-community/kube-prometheus-stack \\n  -n monitoring \\n  -f manifests/monitoring/prometheus-values.yaml
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+helm install grafana grafana/grafana -n monitoring \\n  --set persistence.enabled=true \\n  --set persistence.size=1Gi \\n  --set service.type=ClusterIP
 
-# Port forward SCADA Interface
-kubectl port-forward svc/scada-interface 8093:8093
+kubectl get secret -n monitoring grafana -o jsonpath="{.data.admin-password}" | base64 --decode
 
+kubectl port-forward -n monitoring svc/grafana 3000:80 &
+ 
+kubectl apply -f manifests/configmap/iec61850-data-generator.yaml
+kubectl apply -f manifests/configmap/prometheus-exporter.yaml
+kubectl apply -f manifests/services/prometheus-exporter.yaml
+kubectl apply -f manifests/ec61850-simulator/deployment.yaml
+kubectl apply -f manifests/monitoring/service-monitor.yaml
+```
+
+# Do port forward when above manifests are done
+kubectl port-forward -n grid-station svc/ml-processing 8001:8001 &
+
+kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80 &
+
+kubectl port-forward -n monitoring svc/prometheus-server 9090:9090 &
+
+kubectl port-forward -n grid-station svc/scada-interface 4840:4840 &
+
+Grafana dashboard password could be retrieved using either of
+kubectl get secret -n monitoring grafana -o jsonpath="{.data.admin-password}" | base64 --decode
+or
+kubectl get secret -n monitoring prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 --decode
+
+Grafana dashboard with admin password when used we can get link of grid dashboard
+
+![image](https://github.com/user-attachments/assets/c4dff158-b67a-4463-b422-4a66c2ba4095)
+
+http://127.0.0.1:3000/d/grid-station/grid-station-dashboard?orgId=1&from=now-1h&to=now&timezone=browser&refresh=5s
+
+http://127.0.0.1:8001/ displays ML dashboard
+
+opc.tcp://127.0.0.1:4840 (This cannot be viewed in browser it requires  OPC UA client
 
 
