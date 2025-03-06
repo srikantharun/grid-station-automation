@@ -15,16 +15,19 @@ spec:
     spec:
       containers:
       - name: ml-processor
-        image: pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime
+        image: pytorch/pytorch:latest
         ports:
         - containerPort: 8000
+        workingDir: /app
+        command: ["python"]
+        args: ["/app/app.py"]
         volumeMounts:
         - name: config-volume
           mountPath: /config
         - name: model-storage
           mountPath: /models
-        command: ["python"]
-        args: ["-m", "http.server", "8000"]
+        - name: demo-files
+          mountPath: /app
         env:
         - name: CONFIG_PATH
           value: "/config/config.yaml"
@@ -34,8 +37,8 @@ spec:
           value: "http://ec61850-simulator:102/data"
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "500m"
+            memory: "512Mi"
+            cpu: "200m"
           limits:
             memory: "4Gi"
             cpu: "2000m"
@@ -46,3 +49,6 @@ spec:
       - name: model-storage
         persistentVolumeClaim:
           claimName: ml-model-storage
+      - name: demo-files
+        configMap:
+          name: ml-demo-files

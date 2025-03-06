@@ -9,4 +9,4 @@ spec:
   ports:
   - port: 4840
     targetPort: 4840
-  clusterIP: 10.240.0.12
+  #clusterIP: 10.240.0.12

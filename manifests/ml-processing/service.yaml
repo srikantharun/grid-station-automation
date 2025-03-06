@@ -9,4 +9,4 @@ spec:
   ports:
   - port: 8000
     targetPort: 8000
-  clusterIP: 10.240.0.11
+  #clusterIP: 10.240.0.11

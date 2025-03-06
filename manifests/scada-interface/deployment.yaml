@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: opcua-server
-        image: opensourceuavci/open62541-server:latest
+        image: open62541/open62541:latest 
         ports:
         - containerPort: 4840
         volumeMounts:

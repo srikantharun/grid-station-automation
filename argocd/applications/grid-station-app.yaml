@@ -6,7 +6,7 @@ metadata:
 spec:
   project: grid-station-project
   source:
-    repoURL: https://github.com/yourusername/grid-station.git
+    repoURL: https://github.com/srikantharun/grid-station-automation 
     targetRevision: HEAD
     path: manifests
   destination:

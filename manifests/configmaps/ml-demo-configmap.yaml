@@ -1,0 +1,171 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ml-demo-files
+  namespace: grid-station
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Grid Station ML Processing</title>
+        <meta http-equiv="refresh" content="5">
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; }
+            .container { max-width: 800px; margin: 0 auto; }
+            .card { border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+            .data-value { font-size: 24px; font-weight: bold; margin: 10px 0; }
+            .status { padding: 8px; border-radius: 4px; display: inline-block; }
+            .normal { background-color: #d4edda; color: #155724; }
+            .warning { background-color: #fff3cd; color: #856404; }
+            .critical { background-color: #f8d7da; color: #721c24; }
+            .metric { display: flex; justify-content: space-between; margin-bottom: 10px; }
+            .title { font-weight: bold; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Grid Station ML Processing Dashboard</h1>
+            <p>Real-time data processing from IEC61850 Simulator</p>
+            
+            <div class="card">
+                <h2>Current Readings</h2>
+                <div class="metric">
+                    <span class="title">Total Power (TotW):</span>
+                    <span class="data-value" id="totw">745.32 kW</span>
+                </div>
+                <div class="metric">
+                    <span class="title">Reactive Power (TotVAr):</span>
+                    <span class="data-value" id="totvar">123.45 kVAr</span>
+                </div>
+                <div class="metric">
+                    <span class="title">Frequency (Hz):</span>
+                    <span class="data-value" id="hz">50.02 Hz</span>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>ML Predictions</h2>
+                <div class="metric">
+                    <span class="title">Power Trend (Next 6 hours):</span>
+                    <span class="status normal">Stable</span>
+                </div>
+                <div class="metric">
+                    <span class="title">Anomaly Detection:</span>
+                    <span class="status normal">No anomalies detected</span>
+                </div>
+                <div class="metric">
+                    <span class="title">System Health:</span>
+                    <span class="status normal">Optimal</span>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>Processing Status</h2>
+                <div class="metric">
+                    <span class="title">Last Update:</span>
+                    <span id="timestamp"></span>
+                </div>
+                <div class="metric">
+                    <span class="title">Model Version:</span>
+                    <span>LSTM v2.1</span>
+                </div>
+                <div class="metric">
+                    <span class="title">Data Source:</span>
+                    <span>ec61850-simulator:102</span>
+                </div>
+            </div>
+        </div>
+        
+        <script>
+            // Update the timestamp
+            document.getElementById("timestamp").textContent = new Date().toLocaleString();
+            
+            // In a real application, these would be updated with actual data
+            // For the demo, we can simulate changing values
+            setInterval(function() {
+                const totw = (740 + Math.random() * 10).toFixed(2) + " kW";
+                const totvar = (120 + Math.random() * 8).toFixed(2) + " kVAr";
+                const hz = (50 + (Math.random() - 0.5) * 0.1).toFixed(2) + " Hz";
+                
+                document.getElementById("totw").textContent = totw;
+                document.getElementById("totvar").textContent = totvar;
+                document.getElementById("hz").textContent = hz;
+                document.getElementById("timestamp").textContent = new Date().toLocaleString();
+            }, 2000);
+        </script>
+    </body>
+    </html>
+
+  app.py: |
+    import http.server
+    import socketserver
+    import os
+    import json
+    import random
+    import time
+    import threading
+    from datetime import datetime
+
+    # Simulate data processing
+    class DataProcessor:
+        def __init__(self):
+            self.data = {
+                "TotW": 745.32,
+                "TotVAr": 123.45,
+                "Hz": 50.02,
+                "predictions": {
+                    "power_trend": "Stable",
+                    "anomaly": "No anomalies detected",
+                    "health": "Optimal"
+                },
+                "status": {
+                    "last_update": datetime.now().isoformat(),
+                    "model_version": "LSTM v2.1",
+                    "data_source": "ec61850-simulator:102"
+                }
+            }
+            
+            # Start background thread to update data
+            self.update_thread = threading.Thread(target=self.update_data)
+            self.update_thread.daemon = True
+            self.update_thread.start()
+        
+        def update_data(self):
+            while True:
+                # Simulate data changes
+                self.data["TotW"] = 740 + random.random() * 10
+                self.data["TotVAr"] = 120 + random.random() * 8
+                self.data["Hz"] = 50 + (random.random() - 0.5) * 0.1
+                self.data["status"]["last_update"] = datetime.now().isoformat()
+                
+                # Occasionally change prediction status
+                if random.random() < 0.05:
+                    states = ["Stable", "Increasing", "Decreasing"]
+                    self.data["predictions"]["power_trend"] = random.choice(states)
+                
+                time.sleep(2)
+        
+        def get_data(self):
+            return self.data
+
+    # Create processor instance
+    processor = DataProcessor()
+
+    # Custom HTTP request handler
+    class MLHandler(http.server.SimpleHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == "/api/data":
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(processor.get_data()).encode())
+            else:
+                # Serve files from current directory
+                super().do_GET()
+
+    # Start the server
+    Handler = MLHandler
+    with socketserver.TCPServer(("", 8000), Handler) as httpd:
+        print("Server started at port 8000")
+        httpd.serve_forever()

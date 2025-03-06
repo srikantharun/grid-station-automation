@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: iec61850-server
-        image: dmikhin/libiec61850:latest
+        image: csedge/iec61850-server:latest
         ports:
         - containerPort: 102
         volumeMounts:
