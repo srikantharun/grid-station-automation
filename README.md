@@ -100,6 +100,25 @@ kubectl port-forward svc/ec61850-simulator 8091:8091
 kubectl port-forward svc/ml-processing 8092:8092
 
 kubectl port-forward svc/scada-interface 8093:8093
+```
 
+# Advanced implementation of monitoring and generate data simulation installation
+```
+helm repo update
+kubectl create namespace monitoring
 
+helm install prometheus prometheus-community/kube-prometheus-stack \\n  -n monitoring \\n  -f manifests/monitoring/prometheus-values.yaml
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+helm install grafana grafana/grafana -n monitoring \\n  --set persistence.enabled=true \\n  --set persistence.size=1Gi \\n  --set service.type=ClusterIP
 
+kubectl get secret -n monitoring grafana -o jsonpath="{.data.admin-password}" | base64 --decode
+
+kubectl port-forward -n monitoring svc/grafana 3000:80 &
+ 
+kubectl apply -f manifests/configmap/iec61850-data-generator.yaml
+kubectl apply -f manifests/configmap/prometheus-exporter.yaml
+kubectl apply -f manifests/services/prometheus-exporter.yaml
+kubectl apply -f manifests/ec61850-simulator/deployment.yaml
+kubectl apply -f manifests/monitoring/service-monitor.yaml
+```
