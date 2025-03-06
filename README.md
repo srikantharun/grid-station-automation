@@ -93,13 +93,6 @@ kubectl apply -f manifests/ml-processing/
 
 kubectl apply -f manifests/scada-interface/
 
-kubectl port-forward svc/argocd-server -n argocd 8080:443
-
-kubectl port-forward svc/ec61850-simulator 8091:8091
-
-kubectl port-forward svc/ml-processing 8092:8092
-
-kubectl port-forward svc/scada-interface 8093:8093
 ```
 
 # Advanced implementation of monitoring and generate data simulation installation
@@ -122,3 +115,29 @@ kubectl apply -f manifests/services/prometheus-exporter.yaml
 kubectl apply -f manifests/ec61850-simulator/deployment.yaml
 kubectl apply -f manifests/monitoring/service-monitor.yaml
 ```
+
+# Do port forward when above manifests are done
+kubectl port-forward -n grid-station svc/ml-processing 8001:8001 &
+
+kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80 &
+
+kubectl port-forward -n monitoring svc/prometheus-server 9090:9090 &
+
+kubectl port-forward -n grid-station svc/scada-interface 4840:4840 &
+
+Grafana dashboard password could be retrieved using either of
+kubectl get secret -n monitoring grafana -o jsonpath="{.data.admin-password}" | base64 --decode
+or
+kubectl get secret -n monitoring prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 --decode
+
+Grafana dashboard with admin password when used we can get link of grid dashboard
+
+![image](https://github.com/user-attachments/assets/c4dff158-b67a-4463-b422-4a66c2ba4095)
+
+http://127.0.0.1:3000/d/grid-station/grid-station-dashboard?orgId=1&from=now-1h&to=now&timezone=browser&refresh=5s
+
+http://127.0.0.1:8001/ displays ML dashboard
+
+
+
+
