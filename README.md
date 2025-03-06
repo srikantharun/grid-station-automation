@@ -138,6 +138,6 @@ http://127.0.0.1:3000/d/grid-station/grid-station-dashboard?orgId=1&from=now-1h&
 
 http://127.0.0.1:8001/ displays ML dashboard
 
-
+opc.tcp://127.0.0.1:4840 (This cannot be viewed in browser it requires  OPC UA client
 
 
