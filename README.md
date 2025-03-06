@@ -93,17 +93,12 @@ kubectl apply -f manifests/ml-processing/
 
 kubectl apply -f manifests/scada-interface/
 
-'''
-# Port forwarding 
 kubectl port-forward svc/argocd-server -n argocd 8080:443
 
 kubectl port-forward svc/ec61850-simulator 8091:8091
 
-# Port forward ML Processing service
-# Update with the specific ports you used
 kubectl port-forward svc/ml-processing 8092:8092
 
-# Port forward SCADA Interface
 kubectl port-forward svc/scada-interface 8093:8093
 
 
