@@ -62,6 +62,8 @@ The system consists of three main components:
 - The SCADA Interface exposes the data and insights via OPC UA to external systems
 - Optionally, the ML Processing Pod can send feedback to the IEC61850 Simulator
 
+![image](https://github.com/user-attachments/assets/beda5964-3356-45f6-9029-13b7d5b01416)
+
 ## Deployment Architecture
 
 This setup runs on Azure Kubernetes Service (AKS) using the Azure CNI networking plugin. The components communicate within the cluster network and expose services externally as needed.
