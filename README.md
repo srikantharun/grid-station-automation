@@ -1,6 +1,8 @@
 # Grid Station AKS Deployment
 
-This repository contains Kubernetes manifests for deploying a grid station monitoring system on Azure Kubernetes Service (AKS).
+This repository contains Kubernetes manifests for deploying a grid station monitoring system on Azure Kubernetes Service (AKS). The idea of design is illustrated in below picture
+![image](https://github.com/user-attachments/assets/7db9d176-5117-49f0-b77e-436afcddfc16)
+
 
 ## Repository Structure
 
