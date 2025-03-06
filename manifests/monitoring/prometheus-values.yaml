@@ -1,0 +1,506 @@
+grafana:
+  enabled: true
+  adminPassword: "admin"
+  persistence:
+    enabled: true
+    size: 2Gi
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+      - name: 'grid-station'
+        orgId: 1
+        folder: 'Grid Station'
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/grid-station
+  dashboards:
+    grid-station:
+      grid-station-dashboard:
+        json: |
+          {
+            "annotations": {
+              "list": [
+                {
+                  "builtIn": 1,
+                  "datasource": {
+                    "type": "grafana",
+                    "uid": "-- Grafana --"
+                  },
+                  "enable": true,
+                  "hide": true,
+                  "iconColor": "rgba(0, 211, 255, 1)",
+                  "name": "Annotations & Alerts",
+                  "target": {
+                    "limit": 100,
+                    "matchAny": false,
+                    "tags": [],
+                    "type": "dashboard"
+                  },
+                  "type": "dashboard"
+                }
+              ]
+            },
+            "editable": true,
+            "fiscalYearStartMonth": 0,
+            "graphTooltip": 0,
+            "links": [],
+            "liveNow": false,
+            "panels": [
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "prometheus"
+                },
+                "fieldConfig": {
+                  "defaults": {
+                    "color": {
+                      "mode": "palette-classic"
+                    },
+                    "custom": {
+                      "axisCenteredZero": false,
+                      "axisColorMode": "text",
+                      "axisLabel": "",
+                      "axisPlacement": "auto",
+                      "barAlignment": 0,
+                      "drawStyle": "line",
+                      "fillOpacity": 10,
+                      "gradientMode": "none",
+                      "hideFrom": {
+                        "legend": false,
+                        "tooltip": false,
+                        "viz": false
+                      },
+                      "lineInterpolation": "smooth",
+                      "lineWidth": 3,
+                      "pointSize": 5,
+                      "scaleDistribution": {
+                        "type": "linear"
+                      },
+                      "showPoints": "auto",
+                      "spanNulls": false,
+                      "stacking": {
+                        "group": "A",
+                        "mode": "none"
+                      },
+                      "thresholdsStyle": {
+                        "mode": "off"
+                      }
+                    },
+                    "decimals": 2,
+                    "mappings": [],
+                    "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        },
+                        {
+                          "color": "red",
+                          "value": 80
+                        }
+                      ]
+                    },
+                    "unit": "watt"
+                  },
+                  "overrides": []
+                },
+                "gridPos": {
+                  "h": 8,
+                  "w": 12,
+                  "x": 0,
+                  "y": 0
+                },
+                "id": 2,
+                "options": {
+                  "legend": {
+                    "calcs": [
+                      "min",
+                      "max",
+                      "mean"
+                    ],
+                    "displayMode": "table",
+                    "placement": "right",
+                    "showLegend": true
+                  },
+                  "tooltip": {
+                    "mode": "single",
+                    "sort": "none"
+                  }
+                },
+                "targets": [
+                  {
+                    "datasource": {
+                      "type": "prometheus",
+                      "uid": "prometheus"
+                    },
+                    "editorMode": "code",
+                    "expr": "grid_station_total_power*1000",
+                    "legendFormat": "Total Power",
+                    "range": true,
+                    "refId": "A"
+                  }
+                ],
+                "title": "Power Output",
+                "type": "timeseries"
+              },
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "prometheus"
+                },
+                "fieldConfig": {
+                  "defaults": {
+                    "color": {
+                      "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "max": 51,
+                    "min": 49,
+                    "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "red",
+                          "value": null
+                        },
+                        {
+                          "color": "orange",
+                          "value": 49.5
+                        },
+                        {
+                          "color": "green",
+                          "value": 49.9
+                        },
+                        {
+                          "color": "orange",
+                          "value": 50.1
+                        },
+                        {
+                          "color": "red",
+                          "value": 50.5
+                        }
+                      ]
+                    },
+                    "unit": "hz"
+                  },
+                  "overrides": []
+                },
+                "gridPos": {
+                  "h": 8,
+                  "w": 12,
+                  "x": 12,
+                  "y": 0
+                },
+                "id": 4,
+                "options": {
+                  "orientation": "auto",
+                  "reduceOptions": {
+                    "calcs": [
+                      "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                  },
+                  "showThresholdLabels": false,
+                  "showThresholdMarkers": true
+                },
+                "pluginVersion": "9.3.6",
+                "targets": [
+                  {
+                    "datasource": {
+                      "type": "prometheus",
+                      "uid": "prometheus"
+                    },
+                    "editorMode": "code",
+                    "expr": "grid_station_frequency",
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A"
+                  }
+                ],
+                "title": "Grid Frequency",
+                "type": "gauge"
+              },
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "prometheus"
+                },
+                "fieldConfig": {
+                  "defaults": {
+                    "color": {
+                      "mode": "palette-classic"
+                    },
+                    "custom": {
+                      "axisCenteredZero": false,
+                      "axisColorMode": "text",
+                      "axisLabel": "",
+                      "axisPlacement": "auto",
+                      "barAlignment": 0,
+                      "drawStyle": "line",
+                      "fillOpacity": 0,
+                      "gradientMode": "none",
+                      "hideFrom": {
+                        "legend": false,
+                        "tooltip": false,
+                        "viz": false
+                      },
+                      "lineInterpolation": "linear",
+                      "lineWidth": 1,
+                      "pointSize": 5,
+                      "scaleDistribution": {
+                        "type": "linear"
+                      },
+                      "showPoints": "auto",
+                      "spanNulls": false,
+                      "stacking": {
+                        "group": "A",
+                        "mode": "none"
+                      },
+                      "thresholdsStyle": {
+                        "mode": "off"
+                      }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        },
+                        {
+                          "color": "red",
+                          "value": 80
+                        }
+                      ]
+                    }
+                  },
+                  "overrides": [
+                    {
+                      "matcher": {
+                        "id": "byName",
+                        "options": "Voltage"
+                      },
+                      "properties": [
+                        {
+                          "id": "unit",
+                          "value": "volt"
+                        },
+                        {
+                          "id": "color",
+                          "value": {
+                            "fixedColor": "blue",
+                            "mode": "fixed"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "matcher": {
+                        "id": "byName",
+                        "options": "Current"
+                      },
+                      "properties": [
+                        {
+                          "id": "unit",
+                          "value": "amp"
+                        },
+                        {
+                          "id": "color",
+                          "value": {
+                            "fixedColor": "red",
+                            "mode": "fixed"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "gridPos": {
+                  "h": 8,
+                  "w": 12,
+                  "x": 0,
+                  "y": 8
+                },
+                "id": 6,
+                "options": {
+                  "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                  },
+                  "tooltip": {
+                    "mode": "single",
+                    "sort": "none"
+                  }
+                },
+                "targets": [
+                  {
+                    "datasource": {
+                      "type": "prometheus",
+                      "uid": "prometheus"
+                    },
+                    "editorMode": "code",
+                    "expr": "grid_station_voltage",
+                    "legendFormat": "Voltage",
+                    "range": true,
+                    "refId": "A"
+                  },
+                  {
+                    "datasource": {
+                      "type": "prometheus",
+                      "uid": "prometheus"
+                    },
+                    "editorMode": "code",
+                    "expr": "grid_station_current",
+                    "hide": false,
+                    "legendFormat": "Current",
+                    "range": true,
+                    "refId": "B"
+                  }
+                ],
+                "title": "Voltage & Current",
+                "type": "timeseries"
+              },
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "prometheus"
+                },
+                "fieldConfig": {
+                  "defaults": {
+                    "color": {
+                      "mode": "palette-classic"
+                    },
+                    "custom": {
+                      "axisCenteredZero": false,
+                      "axisColorMode": "text",
+                      "axisLabel": "",
+                      "axisPlacement": "auto",
+                      "barAlignment": 0,
+                      "drawStyle": "line",
+                      "fillOpacity": 10,
+                      "gradientMode": "none",
+                      "hideFrom": {
+                        "legend": false,
+                        "tooltip": false,
+                        "viz": false
+                      },
+                      "lineInterpolation": "smooth",
+                      "lineWidth": 3,
+                      "pointSize": 5,
+                      "scaleDistribution": {
+                        "type": "linear"
+                      },
+                      "showPoints": "auto",
+                      "spanNulls": false,
+                      "stacking": {
+                        "group": "A",
+                        "mode": "none"
+                      },
+                      "thresholdsStyle": {
+                        "mode": "off"
+                      }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        },
+                        {
+                          "color": "red",
+                          "value": 80
+                        }
+                      ]
+                    },
+                    "unit": "voltamp"
+                  },
+                  "overrides": []
+                },
+                "gridPos": {
+                  "h": 8,
+                  "w": 12,
+                  "x": 12,
+                  "y": 8
+                },
+                "id": 8,
+                "options": {
+                  "legend": {
+                    "calcs": [
+                      "min",
+                      "max",
+                      "mean"
+                    ],
+                    "displayMode": "table",
+                    "placement": "right",
+                    "showLegend": true
+                  },
+                  "tooltip": {
+                    "mode": "single",
+                    "sort": "none"
+                  }
+                },
+                "targets": [
+                  {
+                    "datasource": {
+                      "type": "prometheus",
+                      "uid": "prometheus"
+                    },
+                    "editorMode": "code",
+                    "expr": "grid_station_reactive_power*1000",
+                    "legendFormat": "Reactive Power",
+                    "range": true,
+                    "refId": "A"
+                  }
+                ],
+                "title": "Reactive Power",
+                "type": "timeseries"
+              }
+            ],
+            "refresh": "5s",
+            "schemaVersion": 37,
+            "style": "dark",
+            "tags": [],
+            "templating": {
+              "list": []
+            },
+            "time": {
+              "from": "now-15m",
+              "to": "now"
+            },
+            "timepicker": {},
+            "timezone": "",
+            "title": "Grid Station Dashboard",
+            "uid": "grid-station",
+            "version": 1,
+            "weekStart": ""
+          }
+  service:
+    type: ClusterIP
+
+prometheus:
+  prometheusSpec:
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelector: {}
+    serviceMonitorNamespaceSelector: {}
+    podMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelector: {}
+    podMonitorNamespaceSelector: {}
+
+alertmanager:
+  enabled: false
+
+nodeExporter:
+  enabled: true
+
+kubeStateMetrics:
+  enabled: true

@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-exporter
+  namespace: grid-station
+data:
+  exporter.py: |
+    from prometheus_client import start_http_server, Gauge
+    import time
+    import random
+    import csv
+    import os
+    from datetime import datetime
+
+    # Create Prometheus metrics
+    TOTAL_POWER = Gauge("grid_station_total_power", "Total power in kW")
+    REACTIVE_POWER = Gauge("grid_station_reactive_power", "Reactive power in kVAr")
+    FREQUENCY = Gauge("grid_station_frequency", "Grid frequency in Hz")
+    VOLTAGE = Gauge("grid_station_voltage", "Voltage in V")
+    CURRENT = Gauge("grid_station_current", "Current in A")
+
+    def read_latest_data():
+        datafile = "/data/measurements.csv"
+        if not os.path.exists(datafile):
+            # Generate random data if file not found
+            TOTAL_POWER.set(740 + random.uniform(-10, 10))
+            REACTIVE_POWER.set(120 + random.uniform(-8, 8))
+            FREQUENCY.set(50 + random.uniform(-0.05, 0.05))
+            VOLTAGE.set(220 + random.uniform(-3, 3))
+            CURRENT.set(3.4 + random.uniform(-0.2, 0.2))
+            return
+            
+        try:
+            with open(datafile, "r") as f:
+                csv_reader = csv.reader(f)
+                # Skip header
+                next(csv_reader, None)
+                # Get last line
+                last_line = None
+                for line in csv_reader:
+                    last_line = line
+                
+                if last_line:
+                    # Parse values
+                    TOTAL_POWER.set(float(last_line[1]))
+                    REACTIVE_POWER.set(float(last_line[2]))
+                    FREQUENCY.set(float(last_line[3]))
+                    VOLTAGE.set(float(last_line[4]))
+                    CURRENT.set(float(last_line[5]))
+        except Exception as e:
+            print(f"Error reading data: {e}")
+
+    if __name__ == "__main__":
+        # Start up the server to expose the metrics
+        start_http_server(9100)
+        print("Prometheus exporter started on port 9100")
+        
+        # Update metrics every 5 seconds
+        while True:
+            read_latest_data()
+            time.sleep(5)

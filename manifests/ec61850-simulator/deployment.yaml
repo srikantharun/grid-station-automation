@@ -16,6 +16,8 @@ spec:
       containers:
       - name: iec61850-server
         image: csedge/iec61850-server:latest
+        command: ["/bin/sh", "-c"]
+        args: ["cd /data && /scripts/generator.sh & exec sleep infinity"]
         ports:
         - containerPort: 102
         volumeMounts:
@@ -23,6 +25,8 @@ spec:
           mountPath: /config
         - name: data-volume
           mountPath: /data
+        - name: generator-script
+          mountPath: /scripts
         env:
         - name: IEC_SERVER_PORT
           value: "102"
@@ -35,6 +39,24 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
+      - name: prometheus-exporter
+        image: python:3.9-slim
+        command: ["/bin/sh", "-c"]
+        args: ["pip install prometheus-client && python /scripts/exporter.py"]
+        ports:
+        - containerPort: 9100
+        volumeMounts:
+        - name: data-volume
+          mountPath: /data
+        - name: exporter-script
+          mountPath: /scripts
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
       volumes:
       - name: config-volume
         configMap:
@@ -42,3 +64,11 @@ spec:
       - name: data-volume
         persistentVolumeClaim:
           claimName: iec61850-data
+      - name: generator-script
+        configMap:
+          name: iec61850-data-generator
+          defaultMode: 493
+      - name: exporter-script
+        configMap:
+          name: prometheus-exporter
+          defaultMode: 0755

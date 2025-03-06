@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: iec61850-data-generator
+  namespace: grid-station
+data:
+  generator.sh: |
+    #!/bin/sh
+    DATAFILE="/data/measurements.csv"
+
+    # Create CSV header if file doesn't exist
+    if [ ! -f "$DATAFILE" ]; then
+      echo "timestamp,TotW,TotVAr,Hz,Voltage,Current" > "$DATAFILE"
+    fi
+
+    # Generate data continuously
+    counter=0
+    while true; do
+      # Get current timestamp
+      TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+      
+      # Use counter to ensure variation
+      counter=$((counter + 1))
+      seed=$(($(date +%s) + counter))
+      
+      # Generate simulated values with better variation
+      variation1=$((seed % 20 - 10))
+      variation2=$((seed % 16 - 8))
+      variation3=$(((seed % 10) - 5))
+      variation4=$((seed % 6 - 3))
+      
+      TOTW=$((740 + variation1))
+      TOTVAR=$((120 + variation2))
+      HZ=$((50 + variation3 / 100))
+      VOLTAGE=$((220 + variation4))
+      CURRENT=$((TOTW / VOLTAGE))
+      
+      # Append to data file
+      echo "$TIMESTAMP,$TOTW,$TOTVAR,$HZ,$VOLTAGE,$CURRENT" >> "$DATAFILE"
+      
+      # Also output to stdout for logs
+      echo "Generated data: TotW=$TOTW kW, TotVAr=$TOTVAR kVAr, Freq=$HZ Hz, V=$VOLTAGE V, I=$CURRENT A"
+      
+      # Sleep for 5 seconds
+      sleep 5
+    done
