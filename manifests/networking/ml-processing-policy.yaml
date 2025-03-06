@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ml-processing-policy
+  namespace: grid-station
+spec:
+  podSelector:
+    matchLabels:
+      app: ml-processing
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: scada-interface
+    ports:
+    - protocol: TCP
+      port: 8000
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ec61850-simulator
+    ports:
+    - protocol: TCP
+      port: 102

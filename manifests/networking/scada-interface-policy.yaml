@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: scada-interface-policy
+  namespace: grid-station
+spec:
+  podSelector:
+    matchLabels:
+      app: scada-interface
+  ingress:
+  - ports:
+    - protocol: TCP
+      port: 4840
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ml-processing
+    ports:
+    - protocol: TCP
+      port: 8000

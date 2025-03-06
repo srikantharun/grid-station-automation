@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ec61850-simulator-policy
+  namespace: grid-station
+spec:
+  podSelector:
+    matchLabels:
+      app: ec61850-simulator
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ml-processing
+    ports:
+    - protocol: TCP
+      port: 102

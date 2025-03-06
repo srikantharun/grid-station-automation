@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scada-interface
+  namespace: grid-station
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scada-interface
+  template:
+    metadata:
+      labels:
+        app: scada-interface
+    spec:
+      containers:
+      - name: opcua-server
+        image: opensourceuavci/open62541-server:latest
+        ports:
+        - containerPort: 4840
+        volumeMounts:
+        - name: config-volume
+          mountPath: /config
+        env:
+        - name: SERVER_CONFIG
+          value: "/config/opcua-server.conf"
+        - name: DATA_SOURCE_URL
+          value: "http://ml-processing:8000/api/data"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: config-volume
+        configMap:
+          name: opcua-config

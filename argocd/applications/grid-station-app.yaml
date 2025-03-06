@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: grid-station
+  namespace: argocd
+spec:
+  project: grid-station-project
+  source:
+    repoURL: https://github.com/yourusername/grid-station.git
+    targetRevision: HEAD
+    path: manifests
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: grid-station
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

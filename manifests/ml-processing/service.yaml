@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-processing
+  namespace: grid-station
+spec:
+  selector:
+    app: ml-processing
+  ports:
+  - port: 8000
+    targetPort: 8000
+  clusterIP: 10.240.0.11

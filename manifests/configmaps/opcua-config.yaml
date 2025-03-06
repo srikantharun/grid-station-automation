@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opcua-config
+  namespace: grid-station
+data:
+  opcua-server.conf: |
+    [general]
+    server_name = Grid Station OPC UA Server
+    endpoint = opc.tcp://0.0.0.0:4840
+    
+    [security]
+    security_level = None
+    
+    [logging]
+    log_level = Info
+    
+    [nodes]
+    namespace = http://grid-station.com/opcua
+    
+    [mapping]
+    TotW = ns=1;s=GridStation.TotW
+    TotVAr = ns=1;s=GridStation.TotVAr
+    Hz = ns=1;s=GridStation.Hz
+    ML_Prediction = ns=1;s=GridStation.Prediction

@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ec61850-simulator
+  namespace: grid-station
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ec61850-simulator
+  template:
+    metadata:
+      labels:
+        app: ec61850-simulator
+    spec:
+      containers:
+      - name: iec61850-server
+        image: dmikhin/libiec61850:latest
+        ports:
+        - containerPort: 102
+        volumeMounts:
+        - name: config-volume
+          mountPath: /config
+        - name: data-volume
+          mountPath: /data
+        env:
+        - name: IEC_SERVER_PORT
+          value: "102"
+        - name: CONFIG_FILE
+          value: "/config/iec61850-server.conf"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: config-volume
+        configMap:
+          name: iec61850-config
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: iec61850-data

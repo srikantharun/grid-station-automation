@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ml-processing-config
+  namespace: grid-station
+data:
+  config.yaml: |
+    model:
+      type: lstm
+      parameters:
+        hidden_size: 128
+        num_layers: 2
+        dropout: 0.2
+    training:
+      epochs: 50
+      batch_size: 32
+      learning_rate: 0.001
+    data:
+      source: iec61850_simulator
+      features:
+        - TotW
+        - TotVAr
+        - Hz
+      window_size: 24
+      prediction_horizon: 6

@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-processing
+  namespace: grid-station
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ml-processing
+  template:
+    metadata:
+      labels:
+        app: ml-processing
+    spec:
+      containers:
+      - name: ml-processor
+        image: pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime
+        ports:
+        - containerPort: 8000
+        volumeMounts:
+        - name: config-volume
+          mountPath: /config
+        - name: model-storage
+          mountPath: /models
+        command: ["python"]
+        args: ["-m", "http.server", "8000"]
+        env:
+        - name: CONFIG_PATH
+          value: "/config/config.yaml"
+        - name: MODEL_DIR
+          value: "/models"
+        - name: DATA_SOURCE_URL
+          value: "http://ec61850-simulator:102/data"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+      volumes:
+      - name: config-volume
+        configMap:
+          name: ml-processing-config
+      - name: model-storage
+        persistentVolumeClaim:
+          claimName: ml-model-storage

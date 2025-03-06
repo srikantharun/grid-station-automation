@@ -1,0 +1,44 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v1
+        
+      - name: Validate Kubernetes manifests
+        run: |
+          find ./manifests -name "*.yaml" -print0 | xargs -0 -I {} kubectl apply --dry-run=client -f {}
+          
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Yaml Lint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          file_or_dir: manifests/
+          config_file: .yamllint.yaml
+          
+  notify:
+    runs-on: ubuntu-latest
+    needs: [validate, lint]
+    if: ${{ always() }}
+    steps:
+      - name: Notify on success
+        if: ${{ needs.validate.result == 'success' && needs.lint.result == 'success' }}
+        run: echo "All checks passed!"
+        
+      - name: Notify on failure
+        if: ${{ needs.validate.result == 'failure' || needs.lint.result == 'failure' }}
+        run: echo "Some checks failed!"
