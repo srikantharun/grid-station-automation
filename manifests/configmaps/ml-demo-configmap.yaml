@@ -166,6 +166,6 @@ data:
 
     # Start the server
     Handler = MLHandler
-    with socketserver.TCPServer(("", 8000), Handler) as httpd:
-        print("Server started at port 8000")
+    with socketserver.TCPServer(("", 8001), Handler) as httpd:
+        print("Server started at port 8001")
         httpd.serve_forever()
