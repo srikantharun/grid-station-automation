@@ -70,7 +70,7 @@ The system consists of three main components:
 
 This setup runs on Azure Kubernetes Service (AKS) using the Azure CNI networking plugin. The components communicate within the cluster network and expose services externally as needed.
 
-'''
+```
 kubectl create namespace argocd
 
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
