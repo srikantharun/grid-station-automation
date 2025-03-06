@@ -69,3 +69,53 @@ The system consists of three main components:
 ## Deployment Architecture
 
 This setup runs on Azure Kubernetes Service (AKS) using the Azure CNI networking plugin. The components communicate within the cluster network and expose services externally as needed.
+
+# Create ArgoCD namespace
+kubectl create namespace argocd
+
+# Install ArgoCD in the cluster
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+# Wait for ArgoCD server deployment to be available
+kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd
+
+# Apply ArgoCD project configuration
+kubectl apply -f argocd/projects/grid-station-project.yaml
+
+# Apply ArgoCD application configuration
+kubectl apply -f argocd/applications/grid-station-app.yaml
+
+# Apply ConfigMaps
+kubectl apply -f manifests/configmaps/
+
+# Apply Storage configurations
+kubectl apply -f manifests/storage/
+
+# Apply Networking configurations
+kubectl apply -f manifests/networking/
+
+# Deploy IEC 61850 Simulator with service configuration
+kubectl apply -f manifests/ec61850-simulator/
+
+# Deploy ML Processing components
+kubectl apply -f manifests/ml-processing/
+
+# Deploy SCADA Interface components
+kubectl apply -f manifests/scada-interface/
+
+# Port forward ArgoCD server (example - adjust port as needed)
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+# Port forward IEC 61850 Simulator
+# Update with the specific ports you used
+kubectl port-forward svc/ec61850-simulator 8091:8091
+
+# Port forward ML Processing service
+# Update with the specific ports you used
+kubectl port-forward svc/ml-processing 8092:8092
+
+# Port forward SCADA Interface
+kubectl port-forward svc/scada-interface 8093:8093
+
+
+
