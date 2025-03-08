@@ -15,17 +15,27 @@ spec:
     spec:
       containers:
       - name: opcua-server
-        image: open62541/open62541:latest 
+        image: python:3.9-slim
         ports:
         - containerPort: 4840
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            pip install opcua requests &&
+            mkdir -p /app &&
+            cp /scripts/server.py /app/ &&
+            cd /app && 
+            python server.py
         volumeMounts:
         - name: config-volume
           mountPath: /config
+        - name: server-script
+          mountPath: /scripts
         env:
         - name: SERVER_CONFIG
           value: "/config/opcua-server.conf"
         - name: DATA_SOURCE_URL
-          value: "http://ml-processing:8000/api/data"
+          value: "http://ml-processing:8001/api/data"
         resources:
           requests:
             memory: "256Mi"
@@ -37,3 +47,6 @@ spec:
       - name: config-volume
         configMap:
           name: opcua-config
+      - name: server-script
+        configMap:
+          name: scada-interface-handler

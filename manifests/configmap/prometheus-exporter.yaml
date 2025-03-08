@@ -7,10 +7,16 @@ data:
   exporter.py: |
     from prometheus_client import start_http_server, Gauge
     import time
-    import random
     import csv
     import os
-    from datetime import datetime
+    import sys
+
+    # Set up logging to stdout
+    def log(message):
+        print(message, flush=True)
+        sys.stdout.flush()
+
+    log("Starting Prometheus exporter...")
 
     # Create Prometheus metrics
     TOTAL_POWER = Gauge("grid_station_total_power", "Total power in kW")
@@ -18,44 +24,77 @@ data:
     FREQUENCY = Gauge("grid_station_frequency", "Grid frequency in Hz")
     VOLTAGE = Gauge("grid_station_voltage", "Voltage in V")
     CURRENT = Gauge("grid_station_current", "Current in A")
+    POWER_FACTOR = Gauge("grid_station_power_factor", "Power factor")
+    BREAKER_STATUS = Gauge("grid_station_breaker_status", "Breaker status (1=closed, 0=open)")
+    TRANSFORMER_TEMP = Gauge("grid_station_transformer_temp", "Transformer temperature in C")
+    LINE_IMPEDANCE = Gauge("grid_station_line_impedance", "Line impedance in ohms")
+    HARMONIC_DISTORTION = Gauge("grid_station_harmonic_distortion", "Harmonic distortion in %")
 
     def read_latest_data():
         datafile = "/data/measurements.csv"
+    
         if not os.path.exists(datafile):
-            # Generate random data if file not found
-            TOTAL_POWER.set(740 + random.uniform(-10, 10))
-            REACTIVE_POWER.set(120 + random.uniform(-8, 8))
-            FREQUENCY.set(50 + random.uniform(-0.05, 0.05))
-            VOLTAGE.set(220 + random.uniform(-3, 3))
-            CURRENT.set(3.4 + random.uniform(-0.2, 0.2))
+            log(f"Data file not found: {datafile}")
             return
-            
+        
         try:
             with open(datafile, "r") as f:
+                log(f"Reading data file: {datafile}")
                 csv_reader = csv.reader(f)
-                # Skip header
-                next(csv_reader, None)
-                # Get last line
-                last_line = None
-                for line in csv_reader:
-                    last_line = line
+                headers = next(csv_reader, None)
+            
+                if not headers:
+                    log("CSV file has no headers")
+                    return
                 
-                if last_line:
-                    # Parse values
+                log(f"CSV headers: {headers}")
+            
+                # Get all rows
+                rows = list(csv_reader)
+                if not rows:
+                    log("CSV file has no data rows")
+                    return
+                
+                # Get last line
+                last_line = rows[-1]
+                log(f"Processing last row: {last_line}")
+            
+                # Parse values with explicit indices and error handling
+                try:
+                    # Example format: timestamp,TotW,TotVAr,Hz,Voltage,Current,PowerFactor,BreakerStatus,TransformerTemp,LineImpedance,HarmonicDistortion
                     TOTAL_POWER.set(float(last_line[1]))
                     REACTIVE_POWER.set(float(last_line[2]))
                     FREQUENCY.set(float(last_line[3]))
                     VOLTAGE.set(float(last_line[4]))
                     CURRENT.set(float(last_line[5]))
+                
+                    # Additional metrics if available
+                    if len(last_line) > 6:
+                        POWER_FACTOR.set(float(last_line[6]))
+                    if len(last_line) > 7:
+                        BREAKER_STATUS.set(int(last_line[7]))
+                    if len(last_line) > 8:
+                        TRANSFORMER_TEMP.set(float(last_line[8]))
+                    if len(last_line) > 9:
+                        LINE_IMPEDANCE.set(float(last_line[9]))
+                    if len(last_line) > 10:
+                        HARMONIC_DISTORTION.set(float(last_line[10]))
+                
+                    log(f"Updated metrics with values: TotW={last_line[1]}, TotVAr={last_line[2]}, Hz={last_line[3]}, V={last_line[4]}, I={last_line[5]}")
+                except (IndexError, ValueError) as e:
+                    log(f"Error parsing row values: {e}")
         except Exception as e:
-            print(f"Error reading data: {e}")
+            log(f"Error reading data file: {e}")
 
     if __name__ == "__main__":
-        # Start up the server to expose the metrics
-        start_http_server(9100)
-        print("Prometheus exporter started on port 9100")
+        try:
+            # Start up the server to expose the metrics
+            start_http_server(9100)
+            log("Prometheus exporter started on port 9100")
         
-        # Update metrics every 5 seconds
-        while True:
-            read_latest_data()
-            time.sleep(5)
+            # Update metrics every 5 seconds
+            while True:
+                read_latest_data()
+                time.sleep(5)
+        except Exception as e:
+            log(f"Fatal error in main loop: {e}")

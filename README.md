@@ -7,38 +7,47 @@ This repository contains Kubernetes manifests for deploying a grid station monit
 ## Repository Structure
 
 ```
-grid-station/
-├── README.md
-├── .github/
-│   └── workflows/
-│       └── ci-cd.yaml
-├── argocd/
-│   ├── projects/
-│   │   └── grid-station-project.yaml
-│   └── applications/
-│       └── grid-station-app.yaml
-└── manifests/
+grid-station-automation/
+── README.md
+├── argocd
+│   ├── applications
+│   │   └── grid-station-app.yaml
+│   └── projects
+│       └── grid-station-project.yaml
+└── manifests
+    ├── configmap
+    │   ├── iec61850-config.yaml
+    │   ├── iec61850-data-generator.yaml
+    │   ├── ml-demo-configmap.yaml
+    │   ├── ml-processing-config.yaml
+    │   ├── opcua-config.yaml
+    │   ├── prometheus-exporter.yaml
+    │   └── scada-interface-handler.yaml
+    ├── ec61850-simulator
+    │   ├── deployment.yaml
+    │   └── service.yaml
+    ├── ml-processing
+    │   ├── deployment.yaml
+    │   └── service.yaml
+    ├── monitoring
+    │   ├── README.md
+    │   ├── namespace.yaml
+    │   ├── prometheus-basic.yaml
+    │   ├── prometheus-values.yaml
+    │   └── service-monitor.yaml
     ├── namespace.yaml
-    ├── configmaps/
-    │   ├── iec61850-config.yaml
-    │   ├── ml-processing-config.yaml
-    │   └── opcua-config.yaml
-    ├── storage/
-    │   ├── iec61850-data-pvc.yaml
-    │   └── ml-model-storage-pvc.yaml
-    ├── networking/
-    │   ├── ec61850-simulator-policy.yaml
-    │   ├── ml-processing-policy.yaml
-    │   └── scada-interface-policy.yaml
-    ├── ec61850-simulator/
-    │   ├── deployment.yaml
-    │   └── service.yaml
-    ├── ml-processing/
-    │   ├── deployment.yaml
-    │   └── service.yaml
-    └── scada-interface/
-        ├── deployment.yaml
-        └── service.yaml
+    ├── networking
+    │   ├── ec61850-simulator-policy.yaml
+    │   ├── ml-processing-policy.yaml
+    │   └── scada-interface-policy.yaml
+    ├── scada-interface
+    │   ├── deployment.yaml
+    │   └── service.yaml
+    ├── services
+    │   └── prometheus-exporter.yaml
+    └── storage
+        ├── iec61850-data-pvc.yaml
+        └── ml-model-storage-pvc.yaml
 ```
 
 ## Setup Instructions
@@ -81,7 +90,7 @@ kubectl apply -f argocd/projects/grid-station-project.yaml
 
 kubectl apply -f argocd/applications/grid-station-app.yaml
 
-kubectl apply -f manifests/configmaps/
+kubectl apply -f manifests/configmap/
 
 kubectl apply -f manifests/storage/
 
@@ -99,20 +108,14 @@ kubectl apply -f manifests/scada-interface/
 ```
 helm repo update
 kubectl create namespace monitoring
-
-helm install prometheus prometheus-community/kube-prometheus-stack \\n  -n monitoring \\n  -f manifests/monitoring/prometheus-values.yaml
-helm repo add grafana https://grafana.github.io/helm-charts
-helm repo update
-helm install grafana grafana/grafana -n monitoring \\n  --set persistence.enabled=true \\n  --set persistence.size=1Gi \\n  --set service.type=ClusterIP
+helm install prometheus prometheus-community/kube-prometheus-stack -n monitoring -f manifests/monitoring/prometheus-basic.yaml
+helm upgrade prometheus prometheus-community/kube-prometheus-stack -n monitoring -f manifests/monitoring/prometheus-values.yaml
 
 kubectl get secret -n monitoring grafana -o jsonpath="{.data.admin-password}" | base64 --decode
 
 kubectl port-forward -n monitoring svc/grafana 3000:80 &
  
-kubectl apply -f manifests/configmap/iec61850-data-generator.yaml
-kubectl apply -f manifests/configmap/prometheus-exporter.yaml
 kubectl apply -f manifests/services/prometheus-exporter.yaml
-kubectl apply -f manifests/ec61850-simulator/deployment.yaml
 kubectl apply -f manifests/monitoring/service-monitor.yaml
 ```
 
@@ -140,4 +143,4 @@ http://127.0.0.1:8001/ displays ML dashboard
 
 opc.tcp://127.0.0.1:4840 (This cannot be viewed in browser it requires  OPC UA client
 
-
+pkill -f "kubectl port-forward" (This is to kill all port forward)

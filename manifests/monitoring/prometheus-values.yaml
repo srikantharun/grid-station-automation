@@ -464,6 +464,226 @@ grafana:
                 ],
                 "title": "Reactive Power",
                 "type": "timeseries"
+              },
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "prometheus"
+                },
+                "fieldConfig": {
+                  "defaults": {
+                    "color": {
+                      "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "max": 100,
+                    "min": 0,
+                    "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "red",
+                          "value": null
+                        },
+                        {
+                          "color": "orange",
+                          "value": 60
+                        },
+                        {
+                          "color": "green",
+                          "value": 80
+                        }
+                      ]
+                    },
+                    "unit": "percent"
+                  },
+                  "overrides": []
+                },
+                "gridPos": {
+                  "h": 8,
+                  "w": 8,
+                  "x": 0,
+                  "y": 16
+                },
+                "id": 10,
+                "options": {
+                  "orientation": "auto",
+                  "reduceOptions": {
+                    "calcs": [
+                      "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                  },
+                  "showThresholdLabels": false,
+                  "showThresholdMarkers": true
+                },
+                "pluginVersion": "9.3.6",
+                "targets": [
+                  {
+                    "datasource": {
+                      "type": "prometheus",
+                      "uid": "prometheus"
+                    },
+                    "editorMode": "code",
+                    "expr": "100 * grid_station_power_factor",
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A"
+                  }
+                ],
+                "title": "Power Factor",
+                "type": "gauge"
+              },
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "prometheus"
+                },
+                "fieldConfig": {
+                  "defaults": {
+                    "color": {
+                      "mode": "thresholds"
+                    },
+                    "mappings": [
+                      {
+                        "options": {
+                          "0": {
+                            "text": "Open"
+                          },
+                          "1": {
+                            "text": "Closed"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ],
+                    "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "red",
+                          "value": null
+                        },
+                        {
+                          "color": "green",
+                          "value": 1
+                        }
+                      ]
+                    }
+                  },
+                  "overrides": []
+                },
+                "gridPos": {
+                  "h": 8,
+                  "w": 8,
+                  "x": 8,
+                  "y": 16
+                },
+                "id": 12,
+                "options": {
+                  "colorMode": "value",
+                  "graphMode": "area",
+                  "justifyMode": "auto",
+                  "orientation": "auto",
+                  "reduceOptions": {
+                    "calcs": [
+                      "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                  },
+                  "textMode": "auto"
+                },
+                "pluginVersion": "9.3.6",
+                "targets": [
+                  {
+                    "datasource": {
+                      "type": "prometheus",
+                      "uid": "prometheus"
+                    },
+                    "editorMode": "code",
+                    "expr": "grid_station_breaker_status",
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A"
+                  }
+                ],
+                "title": "Breaker Status",
+                "type": "stat"
+              },
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "prometheus"
+                },
+                "fieldConfig": {
+                  "defaults": {
+                    "color": {
+                      "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "max": 100,
+                    "min": 0,
+                    "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        },
+                        {
+                          "color": "orange",
+                          "value": 70
+                        },
+                        {
+                          "color": "red",
+                          "value": 85
+                        }
+                      ]
+                    },
+                    "unit": "celsius"
+                  },
+                  "overrides": []
+                },
+                "gridPos": {
+                  "h": 8,
+                  "w": 8,
+                  "x": 16,
+                  "y": 16
+                },
+                "id": 14,
+                "options": {
+                  "displayMode": "gradient",
+                  "minVizHeight": 10,
+                  "minVizWidth": 0,
+                  "orientation": "horizontal",
+                  "reduceOptions": {
+                    "calcs": [
+                      "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                  },
+                  "showUnfilled": true,
+                  "valueMode": "color"
+                },
+                "pluginVersion": "9.3.6",
+                "targets": [
+                  {
+                    "datasource": {
+                      "type": "prometheus",
+                      "uid": "prometheus"
+                    },
+                    "editorMode": "code",
+                    "expr": "grid_station_transformer_temp",
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A"
+                  }
+                ],
+                "title": "Transformer Temperature",
+                "type": "bargauge"
               }
             ],
             "refresh": "5s",
@@ -487,6 +707,12 @@ grafana:
   service:
     type: ClusterIP
 
+prometheusOperator:
+  admissionWebhooks:
+    enabled: false
+  tls:
+    enabled: false
+
 prometheus:
   prometheusSpec:
     serviceMonitorSelectorNilUsesHelmValues: false
@@ -495,12 +721,135 @@ prometheus:
     podMonitorSelectorNilUsesHelmValues: false
     podMonitorSelector: {}
     podMonitorNamespaceSelector: {}
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "200m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+    retention: 15d
+    additionalScrapeConfigs:
+      - job_name: 'grid-station-direct'
+        scrape_interval: 5s
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - grid-station
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: ec61850-simulator
+          - source_labels: [__meta_kubernetes_pod_container_port_number]
+            action: keep
+            regex: 9100
+      - job_name: 'grid-station'
+        scrape_interval: 5s
+        kubernetes_sd_configs:
+          - role: service
+            namespaces:
+              names:
+                - grid-station
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name]
+            action: keep
+            regex: prometheus-exporter
+    scrapeInterval: "15s"
+    evaluationInterval: "15s"
+    enableAdminAPI: false
+    walCompression: true
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: standard
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
 
 alertmanager:
-  enabled: false
+  enabled: true
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 1Gi
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['alertname', 'job']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      receiver: 'null'
+      routes:
+      - match:
+          alertname: Watchdog
+        receiver: 'null'
+    receivers:
+    - name: 'null'
+    inhibit_rules:
+    - source_match:
+        severity: 'critical'
+      target_match:
+        severity: 'warning'
+      equal: ['alertname', 'namespace']
 
 nodeExporter:
   enabled: true
+  resources:
+    limits:
+      cpu: 200m
+      memory: 50Mi
+    requests:
+      cpu: 100m
+      memory: 30Mi
 
 kubeStateMetrics:
   enabled: true
+
+additionalPrometheusRules:
+  - name: grid-station-rules
+    groups:
+      - name: grid-station-alerts
+        rules:
+          - alert: HighTransformerTemperature
+            expr: grid_station_transformer_temp > 80
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High transformer temperature detected"
+              description: "Transformer temperature has exceeded 80°C for more than 5 minutes (current value: {{ $value }}°C)"
+              
+          - alert: CriticalTransformerTemperature
+            expr: grid_station_transformer_temp > 90
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Critical transformer temperature detected"
+              description: "Transformer temperature has exceeded 90°C (current value: {{ $value }}°C)"
+              
+          - alert: FrequencyDeviation
+            expr: abs(grid_station_frequency - 50) > 0.5
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Grid frequency deviation detected"
+              description: "Grid frequency has deviated more than 0.5 Hz from nominal 50 Hz for more than 2 minutes (current value: {{ $value }} Hz)"
+              
+          - alert: BreakerOpen
+            expr: grid_station_breaker_status == 0
+            for: 1m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Circuit breaker is open"
+              description: "The main circuit breaker has been open for more than 1 minute"

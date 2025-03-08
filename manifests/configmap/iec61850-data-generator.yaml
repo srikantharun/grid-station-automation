@@ -10,11 +10,14 @@ data:
 
     # Create CSV header if file doesn't exist
     if [ ! -f "$DATAFILE" ]; then
-      echo "timestamp,TotW,TotVAr,Hz,Voltage,Current" > "$DATAFILE"
+      echo "timestamp,TotW,TotVAr,Hz,Voltage,Current,PowerFactor,BreakerStatus,TransformerTemp,LineImpedance,HarmonicDistortion" > "$DATAFILE"
     fi
 
     # Generate data continuously
     counter=0
+    breaker_status=1  # 1=closed, 0=open
+    next_breaker_change=600  # Change breaker status after ~600 iterations (50 minutes)
+
     while true; do
       # Get current timestamp
       TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
@@ -23,23 +26,96 @@ data:
       counter=$((counter + 1))
       seed=$(($(date +%s) + counter))
       
-      # Generate simulated values with better variation
-      variation1=$((seed % 20 - 10))
-      variation2=$((seed % 16 - 8))
-      variation3=$(((seed % 10) - 5))
-      variation4=$((seed % 6 - 3))
+      # Occasionally simulate breaker operations (every ~50 minutes)
+      if [ $counter -ge $next_breaker_change ]; then
+        if [ $breaker_status -eq 1 ]; then
+          # Only toggle for a short time when changing from closed to open
+          breaker_status=0
+          next_breaker_change=$((counter + 6))  # Open for ~30 seconds
+        else
+          breaker_status=1
+          next_breaker_change=$((counter + 600))  # Stay closed for ~50 minutes
+        fi
+      fi
+
+      # Base values
+      base_totw=740
+      base_totvar=120
+      base_hz=50
+      base_voltage=220
       
-      TOTW=$((740 + variation1))
-      TOTVAR=$((120 + variation2))
-      HZ=$((50 + variation3 / 100))
-      VOLTAGE=$((220 + variation4))
-      CURRENT=$((TOTW / VOLTAGE))
+      # Generate more realistic power curve with day/night pattern
+      hour=$(date +"%H")
+      hour_num=$((10#$hour))  # Force decimal interpretation
+      
+      # Day/night power consumption curve (24-hour pattern)
+      if [ $hour_num -ge 6 ] && [ $hour_num -lt 9 ]; then
+        # Morning ramp-up (6-9 AM)
+        daily_factor=$((100 + (hour_num - 6) * 40))
+      elif [ $hour_num -ge 9 ] && [ $hour_num -lt 18 ]; then
+        # Daytime (9 AM - 6 PM) - higher load
+        daily_factor=220
+      elif [ $hour_num -ge 18 ] && [ $hour_num -lt 22 ]; then
+        # Evening (6-10 PM) - peak load
+        daily_factor=250
+      else
+        # Night (10 PM - 6 AM) - low load
+        daily_factor=80
+      fi
+      
+      # Apply daily factor
+      adjusted_totw=$((base_totw * daily_factor / 100))
+      
+      # Generate variations
+      variation1=$(((seed % 20) - 10))
+      variation2=$(((seed % 16) - 8))
+      variation3=$(((seed % 10) - 5))
+      variation4=$(((seed % 6) - 3))
+      
+      # Calculate final values with variations
+      TOTW=$((adjusted_totw + variation1))
+      TOTVAR=$((base_totvar + variation2))
+      
+      # If breaker is open, power is minimal (just facility power)
+      if [ $breaker_status -eq 0 ]; then
+        TOTW=5
+        TOTVAR=2
+      fi
+      
+      # Calculate frequency with smaller variations
+      HZ=$(echo "scale=2; $base_hz + $variation3/100" | bc)
+      
+      # Calculate voltage with variations
+      VOLTAGE=$((base_voltage + variation4))
+      
+      # Calculate current based on power and voltage
+      CURRENT=$(echo "scale=2; $TOTW / $VOLTAGE" | bc)
+      
+      # Calculate power factor (0.8 to 0.98)
+      POWER_FACTOR=$(echo "scale=2; 0.8 + ($seed % 18) / 100" | bc)
+      
+      # Transformer temperature (normal around 65°C)
+      temperature_variation=$(((seed % 10) - 5))
+      TRANSFORMER_TEMP=$((65 + temperature_variation))
+      
+      # Add occasional temperature spike (overheating simulation)
+      if [ $((seed % 1000)) -eq 0 ]; then
+        TRANSFORMER_TEMP=$((TRANSFORMER_TEMP + 15))
+      fi
+      
+      # Line impedance (ohms) - normal around 0.3 ohms
+      impedance_variation=$(echo "scale=3; ($seed % 10) / 100" | bc)
+      LINE_IMPEDANCE=$(echo "scale=3; 0.3 + $impedance_variation" | bc)
+      
+      # Harmonic distortion (percentage) - normal < 5%
+      harmonic_variation=$(echo "scale=2; ($seed % 400) / 100" | bc)
+      HARMONIC_DISTORTION=$(echo "scale=2; 3 + $harmonic_variation" | bc)
       
       # Append to data file
-      echo "$TIMESTAMP,$TOTW,$TOTVAR,$HZ,$VOLTAGE,$CURRENT" >> "$DATAFILE"
+      echo "$TIMESTAMP,$TOTW,$TOTVAR,$HZ,$VOLTAGE,$CURRENT,$POWER_FACTOR,$breaker_status,$TRANSFORMER_TEMP,$LINE_IMPEDANCE,$HARMONIC_DISTORTION" >> "$DATAFILE"
       
       # Also output to stdout for logs
-      echo "Generated data: TotW=$TOTW kW, TotVAr=$TOTVAR kVAr, Freq=$HZ Hz, V=$VOLTAGE V, I=$CURRENT A"
+      echo "Generated data: TotW=$TOTW kW, TotVAr=$TOTVAR kVAr, Freq=$HZ Hz, V=$VOLTAGE V, I=$CURRENT A, PF=$POWER_FACTOR, Breaker=$breaker_status, Temp=$TRANSFORMER_TEMP°C, Z=$LINE_IMPEDANCE Ω, THD=$HARMONIC_DISTORTION%"
       
       # Sleep for 5 seconds
       sleep 5

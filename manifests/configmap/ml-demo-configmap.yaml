@@ -12,8 +12,8 @@ data:
         <meta http-equiv="refresh" content="5">
         <style>
             body { font-family: Arial, sans-serif; margin: 40px; }
-            .container { max-width: 800px; margin: 0 auto; }
-            .card { border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+            .container { max-width: 900px; margin: 0 auto; }
+            .card { border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
             .data-value { font-size: 24px; font-weight: bold; margin: 10px 0; }
             .status { padding: 8px; border-radius: 4px; display: inline-block; }
             .normal { background-color: #d4edda; color: #155724; }
@@ -21,6 +21,10 @@ data:
             .critical { background-color: #f8d7da; color: #721c24; }
             .metric { display: flex; justify-content: space-between; margin-bottom: 10px; }
             .title { font-weight: bold; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+            .grid-full { grid-column: span 2; }
+            .health-indicator { height: 20px; background-color: #ddd; border-radius: 4px; overflow: hidden; }
+            .health-bar { height: 100%; background-color: #28a745; }
         </style>
     </head>
     <body>
@@ -28,71 +32,240 @@ data:
             <h1>Grid Station ML Processing Dashboard</h1>
             <p>Real-time data processing from IEC61850 Simulator</p>
             
-            <div class="card">
-                <h2>Current Readings</h2>
-                <div class="metric">
-                    <span class="title">Total Power (TotW):</span>
-                    <span class="data-value" id="totw">745.32 kW</span>
+            <div class="grid">
+                <div class="card">
+                    <h2>Current Readings</h2>
+                    <div class="metric">
+                        <span class="title">Total Power (TotW):</span>
+                        <span class="data-value" id="totw">745.32 kW</span>
+                    </div>
+                    <div class="metric">
+                        <span class="title">Reactive Power (TotVAr):</span>
+                        <span class="data-value" id="totvar">123.45 kVAr</span>
+                    </div>
+                    <div class="metric">
+                        <span class="title">Frequency (Hz):</span>
+                        <span class="data-value" id="hz">50.02 Hz</span>
+                    </div>
+                    <div class="metric">
+                        <span class="title">Voltage:</span>
+                        <span class="data-value" id="voltage">220 V</span>
+                    </div>
+                    <div class="metric">
+                        <span class="title">Current:</span>
+                        <span class="data-value" id="current">3.4 A</span>
+                    </div>
                 </div>
-                <div class="metric">
-                    <span class="title">Reactive Power (TotVAr):</span>
-                    <span class="data-value" id="totvar">123.45 kVAr</span>
+                
+                <div class="card">
+                    <h2>Additional Parameters</h2>
+                    <div class="metric">
+                        <span class="title">Power Factor:</span>
+                        <span class="data-value" id="pf">0.92</span>
+                    </div>
+                    <div class="metric">
+                        <span class="title">Breaker Status:</span>
+                        <span class="data-value" id="breaker">Closed</span>
+                    </div>
+                    <div class="metric">
+                        <span class="title">Transformer Temp:</span>
+                        <span class="data-value" id="temp">65 °C</span>
+                    </div>
+                    <div class="metric">
+                        <span class="title">Line Impedance:</span>
+                        <span class="data-value" id="impedance">0.31 Ω</span>
+                    </div>
+                    <div class="metric">
+                        <span class="title">Harmonic Distortion:</span>
+                        <span class="data-value" id="harmonics">3.2%</span>
+                    </div>
                 </div>
-                <div class="metric">
-                    <span class="title">Frequency (Hz):</span>
-                    <span class="data-value" id="hz">50.02 Hz</span>
+                
+                <div class="card">
+                    <h2>ML Analysis</h2>
+                    <div class="metric">
+                        <span class="title">Power Trend (Next 6h):</span>
+                        <span class="status" id="power-trend">Stable</span>
+                    </div>
+                    <div class="metric">
+                        <span class="title">Anomaly Detection:</span>
+                        <span class="status" id="anomaly">No anomalies detected</span>
+                    </div>
+                    <div class="metric">
+                        <span class="title">System State:</span>
+                        <span class="status" id="system-state">Normal</span>
+                    </div>
+                    <div class="metric">
+                        <span class="title">Power Quality:</span>
+                        <span class="status" id="power-quality">Good</span>
+                    </div>
+                    <div class="metric">
+                        <span class="title">Grid Stability:</span>
+                        <span class="status" id="grid-stability">Stable</span>
+                    </div>
                 </div>
-            </div>
-            
-            <div class="card">
-                <h2>ML Predictions</h2>
-                <div class="metric">
-                    <span class="title">Power Trend (Next 6 hours):</span>
-                    <span class="status normal">Stable</span>
+                
+                <div class="card">
+                    <h2>Equipment Health</h2>
+                    <div class="metric">
+                        <span class="title">Transformer:</span>
+                        <span id="transformer-health">100%</span>
+                    </div>
+                    <div class="health-indicator">
+                        <div class="health-bar" id="transformer-bar" style="width: 100%"></div>
+                    </div>
+                    <div class="metric" style="margin-top: 15px;">
+                        <span class="title">Circuit Breaker:</span>
+                        <span id="breaker-health">100%</span>
+                    </div>
+                    <div class="health-indicator">
+                        <div class="health-bar" id="breaker-bar" style="width: 100%"></div>
+                    </div>
+                    <div class="metric" style="margin-top: 15px;">
+                        <span class="title">Transmission Line:</span>
+                        <span id="line-health">100%</span>
+                    </div>
+                    <div class="health-indicator">
+                        <div class="health-bar" id="line-bar" style="width: 100%"></div>
+                    </div>
                 </div>
-                <div class="metric">
-                    <span class="title">Anomaly Detection:</span>
-                    <span class="status normal">No anomalies detected</span>
-                </div>
-                <div class="metric">
-                    <span class="title">System Health:</span>
-                    <span class="status normal">Optimal</span>
-                </div>
-            </div>
-            
-            <div class="card">
-                <h2>Processing Status</h2>
-                <div class="metric">
-                    <span class="title">Last Update:</span>
-                    <span id="timestamp"></span>
-                </div>
-                <div class="metric">
-                    <span class="title">Model Version:</span>
-                    <span>LSTM v2.1</span>
-                </div>
-                <div class="metric">
-                    <span class="title">Data Source:</span>
-                    <span>ec61850-simulator:102</span>
+                
+                <div class="card grid-full">
+                    <h2>System Status</h2>
+                    <div class="metric">
+                        <span class="title">Last Update:</span>
+                        <span id="timestamp"></span>
+                    </div>
+                    <div class="metric">
+                        <span class="title">Model Version:</span>
+                        <span>LSTM v2.1</span>
+                    </div>
+                    <div class="metric">
+                        <span class="title">Data Source:</span>
+                        <span>iec61850-simulator:102</span>
+                    </div>
+                    <div class="metric">
+                        <span class="title">Current Alert Status:</span>
+                        <span class="status normal" id="alert-status">Normal</span>
+                    </div>
                 </div>
             </div>
         </div>
         
         <script>
-            // Update the timestamp
+            // Initial timestamp update
             document.getElementById("timestamp").textContent = new Date().toLocaleString();
             
-            // In a real application, these would be updated with actual data
-            // For the demo, we can simulate changing values
-            setInterval(function() {
-                const totw = (740 + Math.random() * 10).toFixed(2) + " kW";
-                const totvar = (120 + Math.random() * 8).toFixed(2) + " kVAr";
-                const hz = (50 + (Math.random() - 0.5) * 0.1).toFixed(2) + " Hz";
-                
-                document.getElementById("totw").textContent = totw;
-                document.getElementById("totvar").textContent = totvar;
-                document.getElementById("hz").textContent = hz;
-                document.getElementById("timestamp").textContent = new Date().toLocaleString();
-            }, 2000);
+            // Function to fetch data from API
+            function fetchData() {
+                fetch('/api/data')
+                    .then(response => response.json())
+                    .then(data => {
+                        // Update readings
+                        document.getElementById("totw").textContent = data.readings.TotW.toFixed(2) + " kW";
+                        document.getElementById("totvar").textContent = data.readings.TotVAr.toFixed(2) + " kVAr";
+                        document.getElementById("hz").textContent = data.readings.Hz.toFixed(2) + " Hz";
+                        document.getElementById("voltage").textContent = data.readings.Voltage.toFixed(1) + " V";
+                        document.getElementById("current").textContent = data.readings.Current.toFixed(2) + " A";
+                        document.getElementById("pf").textContent = data.readings.PowerFactor.toFixed(2);
+                        document.getElementById("breaker").textContent = data.readings.BreakerStatus === 1 ? "Closed" : "Open";
+                        document.getElementById("temp").textContent = data.readings.TransformerTemp.toFixed(1) + " °C";
+                        document.getElementById("impedance").textContent = data.readings.LineImpedance.toFixed(2) + " Ω";
+                        document.getElementById("harmonics").textContent = data.readings.HarmonicDistortion.toFixed(1) + "%";
+                        
+                        // Update timestamp
+                        document.getElementById("timestamp").textContent = new Date().toLocaleString();
+                        
+                        // Update analysis
+                        let powerTrendElement = document.getElementById("power-trend");
+                        powerTrendElement.textContent = data.analysis.power_prediction.length > 0 ? "Predicted" : "Insufficient Data";
+                        powerTrendElement.className = "status normal";
+                        
+                        let anomalyElement = document.getElementById("anomaly");
+                        if (Object.keys(data.analysis.anomalies).length > 0) {
+                            anomalyElement.textContent = "Anomalies Detected";
+                            anomalyElement.className = "status critical";
+                        } else {
+                            anomalyElement.textContent = "No Anomalies";
+                            anomalyElement.className = "status normal";
+                        }
+                        
+                        // Update classifications if available
+                        if (data.analysis.classifications && data.analysis.classifications.length > 0) {
+                            // Find overall state
+                            const overallState = data.analysis.classifications.find(c => c.category === "overall");
+                            if (overallState) {
+                                const stateElement = document.getElementById("system-state");
+                                stateElement.textContent = overallState.description;
+                                stateElement.className = "status " + 
+                                    (overallState.state === "alert" ? "critical" : 
+                                     overallState.state === "warning" ? "warning" : "normal");
+                                
+                                // Update alert status
+                                const alertElement = document.getElementById("alert-status");
+                                alertElement.textContent = overallState.state.charAt(0).toUpperCase() + overallState.state.slice(1);
+                                alertElement.className = "status " + 
+                                    (overallState.state === "alert" ? "critical" : 
+                                     overallState.state === "warning" ? "warning" : "normal");
+                            }
+                            
+                            // Find power quality classification
+                            const powerQuality = data.analysis.classifications.find(c => c.category === "power_quality");
+                            if (powerQuality) {
+                                const qualityElement = document.getElementById("power-quality");
+                                qualityElement.textContent = powerQuality.description;
+                                qualityElement.className = "status " + 
+                                    (powerQuality.state === "poor" ? "warning" : 
+                                     powerQuality.state === "fair" ? "warning" : "normal");
+                            }
+                            
+                            // Find stability classification
+                            const stability = data.analysis.classifications.find(c => c.category === "stability");
+                            if (stability) {
+                                const stabilityElement = document.getElementById("grid-stability");
+                                stabilityElement.textContent = stability.description;
+                                stabilityElement.className = "status " + 
+                                    (stability.state === "unstable" ? "critical" : "normal");
+                            }
+                        }
+                        
+                        // Update equipment health
+                        if (data.analysis.equipment_health && data.analysis.equipment_health.components) {
+                            const components = data.analysis.equipment_health.components;
+                            
+                            if (components.transformer) {
+                                const health = components.transformer.health.toFixed(1);
+                                document.getElementById("transformer-health").textContent = health + "%";
+                                document.getElementById("transformer-bar").style.width = health + "%";
+                                document.getElementById("transformer-bar").style.backgroundColor = 
+                                    health < 60 ? "#dc3545" : health < 80 ? "#ffc107" : "#28a745";
+                            }
+                            
+                            if (components.breaker) {
+                                const health = components.breaker.health.toFixed(1);
+                                document.getElementById("breaker-health").textContent = health + "%";
+                                document.getElementById("breaker-bar").style.width = health + "%";
+                                document.getElementById("breaker-bar").style.backgroundColor = 
+                                    health < 60 ? "#dc3545" : health < 80 ? "#ffc107" : "#28a745";
+                            }
+                            
+                            if (components.line) {
+                                const health = components.line.health.toFixed(1);
+                                document.getElementById("line-health").textContent = health + "%";
+                                document.getElementById("line-bar").style.width = health + "%";
+                                document.getElementById("line-bar").style.backgroundColor = 
+                                    health < 60 ? "#dc3545" : health < 80 ? "#ffc107" : "#28a745";
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching data:', error);
+                    });
+            }
+            
+            // Initial fetch and setup regular updates
+            fetchData();
+            setInterval(fetchData, 5000);
         </script>
     </body>
     </html>
@@ -105,24 +278,300 @@ data:
     import random
     import time
     import threading
-    from datetime import datetime
+    from datetime import datetime, timedelta
+    import yaml
+    import requests
 
-    # Simulate data processing
+    # Load configuration
+    def load_config():
+        try:
+            with open('/config/config.yaml', 'r') as file:
+                return yaml.safe_load(file)
+        except Exception as e:
+            print(f"Error loading config: {e}")
+            return {
+                "model": {
+                    "type": "lstm",
+                    "parameters": {
+                        "hidden_size": 128,
+                        "num_layers": 2,
+                        "dropout": 0.2
+                    }
+                },
+                "data": {
+                    "source": "iec61850_simulator",
+                    "features": [
+                        "TotW", "TotVAr", "Hz", "Voltage", "Current", 
+                        "PowerFactor", "BreakerStatus", "TransformerTemp", 
+                        "LineImpedance", "HarmonicDistortion"
+                    ],
+                    "window_size": 24,
+                    "prediction_horizon": 6
+                }
+            }
+
+    # Anomaly Detection Class
+    class AnomalyDetector:
+        def __init__(self):
+            self.baselines = {
+                'TotW': {'mean': 740, 'std': 150},
+                'TotVAr': {'mean': 120, 'std': 20},
+                'Hz': {'mean': 50, 'std': 0.1},
+                'Voltage': {'mean': 220, 'std': 5},
+                'Current': {'mean': 3.5, 'std': 0.8},
+                'PowerFactor': {'mean': 0.9, 'std': 0.05},
+                'TransformerTemp': {'mean': 65, 'std': 5},
+                'LineImpedance': {'mean': 0.3, 'std': 0.05},
+                'HarmonicDistortion': {'mean': 3.5, 'std': 0.8}
+            }
+            self.anomaly_history = []
+            
+        def detect_anomalies(self, readings):
+            anomalies = {}
+            
+            # Check each reading against its baseline
+            for feature, value in readings.items():
+                if feature in self.baselines:
+                    baseline = self.baselines[feature]
+                    # Calculate z-score
+                    z_score = abs((value - baseline['mean']) / baseline['std'])
+                    
+                    # Flag as anomaly if z-score is > 3 (beyond 3 standard deviations)
+                    if z_score > 3:
+                        anomalies[feature] = {
+                            'value': value,
+                            'expected': baseline['mean'],
+                            'severity': 'high' if z_score > 5 else 'medium'
+                        }
+                        
+            # Special case for breaker status
+            if 'BreakerStatus' in readings and readings['BreakerStatus'] == 0:
+                anomalies['BreakerStatus'] = {
+                    'value': 0,
+                    'expected': 1,
+                    'severity': 'medium'
+                }
+                
+            # Check for high transformer temperature
+            if 'TransformerTemp' in readings and readings['TransformerTemp'] > 75:
+                anomalies['TransformerTemp'] = {
+                    'value': readings['TransformerTemp'],
+                    'expected': '< 75',
+                    'severity': 'high' if readings['TransformerTemp'] > 85 else 'medium'
+                }
+                
+            # Check for frequency deviation (critical for grid stability)
+            if 'Hz' in readings:
+                freq_deviation = abs(readings['Hz'] - 50)
+                if freq_deviation > 0.5:
+                    anomalies['Hz'] = {
+                        'value': readings['Hz'],
+                        'expected': '50 ± 0.5',
+                        'severity': 'high' if freq_deviation > 1 else 'medium'
+                    }
+                    
+            # Store anomaly in history
+            if anomalies:
+                self.anomaly_history.append({
+                    'timestamp': datetime.now().isoformat(),
+                    'anomalies': anomalies
+                })
+                # Keep only last 100 anomalies
+                if len(self.anomaly_history) > 100:
+                    self.anomaly_history.pop(0)
+                    
+            return anomalies
+            
+        def get_anomaly_history(self):
+            return self.anomaly_history
+
+    # Power Prediction Class
+    class PowerPredictor:
+        def __init__(self):
+            self.history = []
+            self.max_history_length = 288  # 24 hours of 5-minute data
+            
+        def add_reading(self, reading):
+            # Add current reading to history
+            timestamp = datetime.now()
+            self.history.append({
+                'timestamp': timestamp,
+                'reading': reading
+            })
+            
+            # Maintain history length
+            if len(self.history) > self.max_history_length:
+                self.history.pop(0)
+                
+        def predict_power(self, hours_ahead=6):
+            # Simple prediction based on previous day patterns and trend
+            if len(self.history) < 12:  # Need at least 1 hour of data
+                return None
+                
+            predictions = []
+            current_time = datetime.now()
+            
+            for i in range(1, hours_ahead + 1):
+                future_time = current_time + timedelta(hours=i)
+                future_hour = future_time.hour
+                
+                # Find similar hours in history (same hour of day)
+                similar_hour_readings = []
+                for h in self.history:
+                    h_time = h['timestamp']
+                    if isinstance(h_time, str):
+                        try:
+                            h_time = datetime.fromisoformat(h_time)
+                        except ValueError:
+                            continue
+                    if h_time.hour == future_hour:
+                        similar_hour_readings.append(h['reading']['TotW'])
+                
+                # Current trend calculation (last 1 hour)
+                recent_values = [h['reading']['TotW'] for h in self.history[-12:]]
+                if len(recent_values) >= 2:
+                    trend = (recent_values[-1] - recent_values[0]) / len(recent_values)
+                else:
+                    trend = 0
+                    
+                # Prediction combines historical patterns with recent trend
+                if similar_hour_readings:
+                    baseline = sum(similar_hour_readings) / len(similar_hour_readings)
+                    prediction = baseline + (trend * i * 12)  # Extrapolate trend
+                else:
+                    # Fallback if no historical data for this hour
+                    prediction = self.history[-1]['reading']['TotW'] + (trend * i * 12)
+                    
+                predictions.append({
+                    'timestamp': future_time.isoformat(),
+                    'hour': future_hour,
+                    'predicted_power': max(0, prediction)  # Power can't be negative
+                })
+                
+            return predictions
+
+    # Equipment Health Monitor
+    class EquipmentHealthMonitor:
+        def __init__(self):
+            self.components = {
+                'transformer': {
+                    'health': 100,
+                    'last_maintenance': datetime.now() - timedelta(days=30),
+                    'maintenance_interval': 90  # days
+                },
+                'breaker': {
+                    'health': 100,
+                    'operation_count': 0,
+                    'max_operations': 10000
+                },
+                'line': {
+                    'health': 100,
+                    'last_inspection': datetime.now() - timedelta(days=45),
+                    'inspection_interval': 180  # days
+                }
+            }
+            self.last_breaker_status = 1  # Initialize with closed status
+            
+        def update_health(self, readings):
+            # Update transformer health based on temperature and time
+            if 'TransformerTemp' in readings:
+                temp = readings['TransformerTemp']
+                # Temperature affects health (higher temp = faster degradation)
+                if temp > 85:
+                    self.components['transformer']['health'] -= 0.02
+                elif temp > 75:
+                    self.components['transformer']['health'] -= 0.01
+                
+            # Update breaker health based on operations
+            if 'BreakerStatus' in readings:
+                current_status = readings['BreakerStatus']
+                # Track operations (status changes) - simplified
+                if self.last_breaker_status != current_status:
+                    self.components['breaker']['operation_count'] += 1
+                    # Update health based on operation count
+                    self.components['breaker']['health'] = 100 * (1 - self.components['breaker']['operation_count'] / self.components['breaker']['max_operations'])
+                self.last_breaker_status = current_status
+                
+            # Update line health based on impedance and harmonics
+            if 'LineImpedance' in readings and 'HarmonicDistortion' in readings:
+                impedance = readings['LineImpedance']
+                harmonics = readings['HarmonicDistortion']
+                
+                # High impedance or harmonics affect line health
+                if impedance > 0.4 or harmonics > 6:
+                    self.components['line']['health'] -= 0.01
+                    
+            # Ensure health stays between 0-100
+            for component in self.components:
+                self.components[component]['health'] = max(0, min(100, self.components[component]['health']))
+                
+            # Calculate maintenance needs
+            self.calculate_maintenance_needs()
+            
+            return self.get_health_status()
+            
+        def calculate_maintenance_needs(self):
+            current_date = datetime.now()
+            
+            # Transformer maintenance based on time interval and health
+            transformer = self.components['transformer']
+            days_since_maintenance = (current_date - transformer['last_maintenance']).days
+            transformer['needs_maintenance'] = (days_since_maintenance > transformer['maintenance_interval'] 
+                                            or transformer['health'] < 70)
+            transformer['maintenance_urgency'] = 'high' if transformer['health'] < 60 else 'medium' if transformer['needs_maintenance'] else 'low'
+            
+            # Breaker maintenance based on operation count and health
+            breaker = self.components['breaker']
+            breaker['needs_maintenance'] = (breaker['operation_count'] > 5000 or breaker['health'] < 70)
+            breaker['maintenance_urgency'] = 'high' if breaker['health'] < 60 else 'medium' if breaker['needs_maintenance'] else 'low'
+            
+            # Line maintenance based on time interval and health
+            line = self.components['line']
+            days_since_inspection = (current_date - line['last_inspection']).days
+            line['needs_maintenance'] = (days_since_inspection > line['inspection_interval'] 
+                                    or line['health'] < 70)
+            line['maintenance_urgency'] = 'high' if line['health'] < 60 else 'medium' if line['needs_maintenance'] else 'low'
+            
+        def get_health_status(self):
+            return {
+                'components': self.components,
+                'overall_health': sum(c['health'] for c in self.components.values()) / len(self.components),
+                'maintenance_required': any(c.get('needs_maintenance', False) for c in self.components.values()),
+                'critical_issues': any(c.get('maintenance_urgency') == 'high' for c in self.components.values())
+            }
+
+    # Main Data Processor Class
     class DataProcessor:
         def __init__(self):
+            self.config = load_config()
+            self.anomaly_detector = AnomalyDetector()
+            self.power_predictor = PowerPredictor()
+            self.health_monitor = EquipmentHealthMonitor()
+            
+            # Initial data state
             self.data = {
-                "TotW": 745.32,
-                "TotVAr": 123.45,
-                "Hz": 50.02,
-                "predictions": {
-                    "power_trend": "Stable",
-                    "anomaly": "No anomalies detected",
-                    "health": "Optimal"
+                "readings": {
+                    "TotW": 745.32,
+                    "TotVAr": 123.45,
+                    "Hz": 50.02,
+                    "Voltage": 220,
+                    "Current": 3.4,
+                    "PowerFactor": 0.92,
+                    "BreakerStatus": 1,
+                    "TransformerTemp": 65,
+                    "LineImpedance": 0.31,
+                    "HarmonicDistortion": 3.2
+                },
+                "analysis": {
+                    "anomalies": {},
+                    "power_prediction": [],
+                    "equipment_health": {},
+                    "classifications": []
                 },
                 "status": {
                     "last_update": datetime.now().isoformat(),
                     "model_version": "LSTM v2.1",
-                    "data_source": "ec61850-simulator:102"
+                    "data_source": "iec61850-simulator:102"
                 }
             }
             
@@ -130,42 +579,208 @@ data:
             self.update_thread = threading.Thread(target=self.update_data)
             self.update_thread.daemon = True
             self.update_thread.start()
+            
+            # Thread for sending data to SCADA interface
+            self.scada_thread = threading.Thread(target=self.send_to_scada)
+            self.scada_thread.daemon = True
+            self.scada_thread.start()
         
         def update_data(self):
             while True:
-                # Simulate data changes
-                self.data["TotW"] = 740 + random.random() * 10
-                self.data["TotVAr"] = 120 + random.random() * 8
-                self.data["Hz"] = 50 + (random.random() - 0.5) * 0.1
-                self.data["status"]["last_update"] = datetime.now().isoformat()
+                try:
+                    # Read data from CSV file (simulating IEC61850 data)
+                    datafile = "/data/measurements.csv"
+                    if os.path.exists(datafile):
+                        try:
+                            with open(datafile, 'r') as f:
+                                import csv
+                                reader = csv.DictReader(f)
+                                rows = list(reader)
+                                if rows:
+                                    # Get the last row with complete data
+                                    last_row = rows[-1]
+                                    # Convert string values to float/int
+                                    self.data["readings"] = {
+                                        "TotW": float(last_row.get('TotW', 0)),
+                                        "TotVAr": float(last_row.get('TotVAr', 0)),
+                                        "Hz": float(last_row.get('Hz', 50)),
+                                        "Voltage": float(last_row.get('Voltage', 220)),
+                                        "Current": float(last_row.get('Current', 0)),
+                                        "PowerFactor": float(last_row.get('PowerFactor', 0.9)),
+                                        "BreakerStatus": int(last_row.get('BreakerStatus', 1)),
+                                        "TransformerTemp": float(last_row.get('TransformerTemp', 65)),
+                                        "LineImpedance": float(last_row.get('LineImpedance', 0.3)),
+                                        "HarmonicDistortion": float(last_row.get('HarmonicDistortion', 3))
+                                    }
+                        except Exception as e:
+                            print(f"Error reading CSV: {e}")
+                            # If there's an error, use simulated data
+                            self.generate_random_data()
+                    else:
+                        # If file doesn't exist, create simulated random data
+                        self.generate_random_data()
+                    
+                    # Process the data
+                    self.process_current_readings()
+                    
+                    # Update timestamp
+                    self.data["status"]["last_update"] = datetime.now().isoformat()
+                except Exception as e:
+                    print(f"Error updating data: {e}")
                 
-                # Occasionally change prediction status
-                if random.random() < 0.05:
-                    states = ["Stable", "Increasing", "Decreasing"]
-                    self.data["predictions"]["power_trend"] = random.choice(states)
+                time.sleep(5)
+        
+        def generate_random_data(self):
+            self.data["readings"] = {
+                "TotW": 740 + random.random() * 10,
+                "TotVAr": 120 + random.random() * 8,
+                "Hz": 50 + (random.random() - 0.5) * 0.1,
+                "Voltage": 220 + (random.random() - 0.5) * 5,
+                "Current": 3.4 + (random.random() - 0.5) * 0.2,
+                "PowerFactor": 0.9 + (random.random() - 0.5) * 0.05,
+                "BreakerStatus": 1,  # Usually closed
+                "TransformerTemp": 65 + (random.random() - 0.5) * 5,
+                "LineImpedance": 0.3 + (random.random() - 0.5) * 0.05,
+                "HarmonicDistortion": 3 + random.random() * 1
+            }
+        
+        def process_current_readings(self):
+            readings = self.data["readings"]
+            
+            # 1. Detect anomalies
+            anomalies = self.anomaly_detector.detect_anomalies(readings)
+            self.data["analysis"]["anomalies"] = anomalies
+            
+            # 2. Update power predictor and get predictions
+            self.power_predictor.add_reading(readings)
+            predictions = self.power_predictor.predict_power()
+            if predictions:
+                self.data["analysis"]["power_prediction"] = predictions
+            
+            # 3. Update equipment health
+            health_status = self.health_monitor.update_health(readings)
+            self.data["analysis"]["equipment_health"] = health_status
+            
+            # 4. Classify current grid state
+            classifications = self.classify_grid_state(readings, anomalies, health_status)
+            self.data["analysis"]["classifications"] = classifications
+        
+        def classify_grid_state(self, readings, anomalies, health_status):
+            classifications = []
+            
+            # Power flow classification
+            if readings["TotW"] > 900:
+                classifications.append({"category": "power_flow", "state": "high_load", "description": "High power demand"})
+            elif readings["TotW"] < 300:
+                classifications.append({"category": "power_flow", "state": "low_load", "description": "Low power demand"})
+            else:
+                classifications.append({"category": "power_flow", "state": "normal", "description": "Normal power flow"})
+            
+            # Stability classification
+            if "Hz" in anomalies or abs(readings["Hz"] - 50) > 0.2:
+                classifications.append({"category": "stability", "state": "unstable", "description": "Frequency deviation detected"})
+            else:
+                classifications.append({"category": "stability", "state": "stable", "description": "Grid frequency stable"})
+            
+            # Power quality classification
+            if readings["HarmonicDistortion"] > 5:
+                classifications.append({"category": "power_quality", "state": "poor", "description": "High harmonic distortion"})
+            elif readings["PowerFactor"] < 0.85:
+                classifications.append({"category": "power_quality", "state": "fair", "description": "Low power factor"})
+            else:
+                classifications.append({"category": "power_quality", "state": "good", "description": "Good power quality"})
+            
+            # Equipment status classification
+            if health_status.get("critical_issues", False):
+                classifications.append({"category": "equipment", "state": "critical", "description": "Critical equipment issues detected"})
+            elif health_status.get("maintenance_required", False):
+                classifications.append({"category": "equipment", "state": "maintenance", "description": "Maintenance required"})
+            else:
+                classifications.append({"category": "equipment", "state": "healthy", "description": "All equipment healthy"})
+            
+            # Overall system state
+            if "critical" in [c["state"] for c in classifications] or "unstable" in [c["state"] for c in classifications]:
+                classifications.append({"category": "overall", "state": "alert", "description": "System requires immediate attention"})
+            elif "maintenance" in [c["state"] for c in classifications] or "poor" in [c["state"] for c in classifications]:
+                classifications.append({"category": "overall", "state": "warning", "description": "System requires monitoring"})
+            else:
+                classifications.append({"category": "overall", "state": "normal", "description": "System operating normally"})
+            
+            return classifications
+        
+        def send_to_scada(self):
+            while True:
+                try:
+                    # Prepare data package for SCADA
+                    scada_data = {
+                        "measurements": self.data["readings"],
+                        "analysis": {
+                            "anomalies": bool(self.data["analysis"]["anomalies"]),
+                            "anomaly_details": self.data["analysis"]["anomalies"],
+                            "system_state": next((c for c in self.data["analysis"]["classifications"] if c["category"] == "overall"), {}).get("state", "normal"),
+                            "power_trend": [
+                                {"timestamp": p["timestamp"], "value": p["predicted_power"]} 
+                                for p in self.data["analysis"].get("power_prediction", [])
+                            ],
+                            "equipment_health": {
+                                "transformer": self.data["analysis"].get("equipment_health", {}).get("components", {}).get("transformer", {}).get("health", 100),
+                                "breaker": self.data["analysis"].get("equipment_health", {}).get("components", {}).get("breaker", {}).get("health", 100),
+                                "line": self.data["analysis"].get("equipment_health", {}).get("components", {}).get("line", {}).get("health", 100)
+                            }
+                        },
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    
+                    # Send data to SCADA interface
+                    try:
+                        requests.post("http://scada-interface:4840/data", json=scada_data, timeout=2)
+                    except requests.exceptions.RequestException as e:
+                        # Silent fail - SCADA might not be ready yet
+                        pass
+                except Exception as e:
+                    print(f"Error sending data to SCADA: {e}")
                 
-                time.sleep(2)
+                time.sleep(10)
         
         def get_data(self):
             return self.data
 
-    # Create processor instance
-    processor = DataProcessor()
-
     # Custom HTTP request handler
     class MLHandler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            # Create processor instance if not passed
+            self.processor = kwargs.pop('processor', None)
+            super().__init__(*args, **kwargs)
+        
         def do_GET(self):
             if self.path == "/api/data":
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
                 self.end_headers()
                 self.wfile.write(json.dumps(processor.get_data()).encode())
+            elif self.path == "/api/anomalies":
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(processor.anomaly_detector.get_anomaly_history()).encode())
+            elif self.path.startswith("/api/"):
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b'API endpoint not found')
             else:
-                # Serve files from current directory
+                # For all other paths, serve files from current directory
                 super().do_GET()
 
+    # Create processor instance
+    processor = DataProcessor()
+
+    # Create HTTP handler that uses the processor
+    def handler_factory(*args, **kwargs):
+        kwargs['processor'] = processor
+        return MLHandler(*args, **kwargs)
+
     # Start the server
-    Handler = MLHandler
-    with socketserver.TCPServer(("", 8001), Handler) as httpd:
-        print("Server started at port 8001")
-        httpd.serve_forever()
+    port = 8001
+    httpd = socketserver.TCPServer(("", port), handler_factory)
+    print(f"Server started at port {port}")
+    httpd.serve_forever()

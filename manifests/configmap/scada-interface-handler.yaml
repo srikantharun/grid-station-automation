@@ -1,0 +1,197 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scada-interface-handler
+  namespace: grid-station
+data:
+  server.py: |
+    import sys
+    import os
+    import json
+    import time
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    import opcua
+    from opcua import ua
+    from datetime import datetime
+
+    # Global data storage for latest values
+    latest_data = {
+        "measurements": {
+            "TotW": 740,
+            "TotVAr": 120,
+            "Hz": 50,
+            "Voltage": 220,
+            "Current": 3.4,
+            "PowerFactor": 0.92,
+            "BreakerStatus": 1,
+            "TransformerTemp": 65,
+            "LineImpedance": 0.3,
+            "HarmonicDistortion": 3.2
+        },
+        "analysis": {
+            "anomalies": False,
+            "anomaly_details": {},
+            "system_state": "normal",
+            "power_trend": [],
+            "equipment_health": {
+                "transformer": 100,
+                "breaker": 100,
+                "line": 100
+            }
+        },
+        "timestamp": datetime.now().isoformat()
+    }
+
+    # HTTP Handler to receive data from ML Processing
+    class DataReceiver(BaseHTTPRequestHandler):
+        def do_POST(self):
+            global latest_data
+            
+            if self.path == "/data":
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                
+                try:
+                    data = json.loads(post_data.decode('utf-8'))
+                    latest_data = data
+                    print(f"Received data update: {data['timestamp']}")
+                    
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "success"}).encode())
+                except Exception as e:
+                    print(f"Error processing data: {e}")
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode())
+            else:
+                self.send_response(404)
+                self.end_headers()
+
+    # OPC UA Server class
+    class OpcUaServer:
+        def __init__(self):
+            # Load config
+            self.endpoint = "opc.tcp://0.0.0.0:4840"
+            self.server_name = "Grid Station OPC UA Server"
+            self.namespace = "http://grid-station.com/opcua"
+            
+            # Initialize server
+            self.server = opcua.Server()
+            self.server.set_endpoint(self.endpoint)
+            self.server.set_server_name(self.server_name)
+            
+            # Set up namespace
+            self.idx = self.server.register_namespace(self.namespace)
+            
+            # Create objects
+            self.objects = self.server.get_objects_node()
+            self.grid_station = self.objects.add_object(self.idx, "GridStation")
+            
+            # Create folders for organization
+            self.measurements = self.grid_station.add_folder(self.idx, "Measurements")
+            self.analysis = self.grid_station.add_folder(self.idx, "Analysis")
+            self.equipment = self.analysis.add_folder(self.idx, "Equipment")
+            
+            # Create variables for measurements
+            self.var_totw = self.measurements.add_variable(self.idx, "TotalPower", 0.0)
+            self.var_totvar = self.measurements.add_variable(self.idx, "ReactivePower", 0.0)
+            self.var_hz = self.measurements.add_variable(self.idx, "Frequency", 0.0)
+            self.var_voltage = self.measurements.add_variable(self.idx, "Voltage", 0.0)
+            self.var_current = self.measurements.add_variable(self.idx, "Current", 0.0)
+            self.var_pf = self.measurements.add_variable(self.idx, "PowerFactor", 0.0)
+            self.var_breaker = self.measurements.add_variable(self.idx, "BreakerStatus", False)
+            self.var_temp = self.measurements.add_variable(self.idx, "TransformerTemp", 0.0)
+            self.var_impedance = self.measurements.add_variable(self.idx, "LineImpedance", 0.0)
+            self.var_harmonics = self.measurements.add_variable(self.idx, "HarmonicDistortion", 0.0)
+            
+            # Create variables for analysis
+            self.var_anomalies = self.analysis.add_variable(self.idx, "AnomaliesDetected", False)
+            self.var_system_state = self.analysis.add_variable(self.idx, "SystemState", "normal")
+            self.var_last_update = self.analysis.add_variable(self.idx, "LastUpdate", "")
+            
+            # Equipment health variables
+            self.var_transformer_health = self.equipment.add_variable(self.idx, "TransformerHealth", 100.0)
+            self.var_breaker_health = self.equipment.add_variable(self.idx, "BreakerHealth", 100.0)
+            self.var_line_health = self.equipment.add_variable(self.idx, "LineHealth", 100.0)
+            
+            # Set variables to be writable if needed (e.g., for control)
+            self.var_breaker.set_writable()
+            
+            # Start the server
+            self.server.start()
+            print(f"OPC UA Server started at {self.endpoint}")
+            
+            # Start update thread
+            self.update_thread = threading.Thread(target=self.update_loop)
+            self.update_thread.daemon = True
+            self.update_thread.start()
+        
+        def update_loop(self):
+            global latest_data
+            
+            while True:
+                try:
+                    # Update all variables with latest data
+                    measurements = latest_data.get("measurements", {})
+                    analysis = latest_data.get("analysis", {})
+                    
+                    # Update measurement variables
+                    self.var_totw.set_value(measurements.get("TotW", 0))
+                    self.var_totvar.set_value(measurements.get("TotVAr", 0))
+                    self.var_hz.set_value(measurements.get("Hz", 0))
+                    self.var_voltage.set_value(measurements.get("Voltage", 0))
+                    self.var_current.set_value(measurements.get("Current", 0))
+                    self.var_pf.set_value(measurements.get("PowerFactor", 0))
+                    self.var_breaker.set_value(measurements.get("BreakerStatus", 0) == 1)
+                    self.var_temp.set_value(measurements.get("TransformerTemp", 0))
+                    self.var_impedance.set_value(measurements.get("LineImpedance", 0))
+                    self.var_harmonics.set_value(measurements.get("HarmonicDistortion", 0))
+                    
+                    # Update analysis variables
+                    self.var_anomalies.set_value(analysis.get("anomalies", False))
+                    self.var_system_state.set_value(analysis.get("system_state", "normal"))
+                    self.var_last_update.set_value(latest_data.get("timestamp", ""))
+                    
+                    # Update equipment health
+                    equipment_health = analysis.get("equipment_health", {})
+                    self.var_transformer_health.set_value(equipment_health.get("transformer", 100))
+                    self.var_breaker_health.set_value(equipment_health.get("breaker", 100))
+                    self.var_line_health.set_value(equipment_health.get("line", 100))
+                    
+                except Exception as e:
+                    print(f"Error updating OPC UA variables: {e}")
+                
+                time.sleep(1)
+        
+        def stop(self):
+            self.server.stop()
+            print("OPC UA Server stopped")
+
+    # Main function
+    def main():
+        # Start HTTP server in a separate thread
+        http_server = HTTPServer(('', 4840), DataReceiver)
+        http_thread = threading.Thread(target=http_server.serve_forever)
+        http_thread.daemon = True
+        http_thread.start()
+        print("HTTP Server started on port 4840")
+        
+        # Start OPC UA server
+        opcua_server = OpcUaServer()
+        
+        try:
+            # Keep main thread alive
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("Shutting down servers...")
+            http_server.shutdown()
+            opcua_server.stop()
+            print("Servers stopped")
+
+    if __name__ == "__main__":
+        main()

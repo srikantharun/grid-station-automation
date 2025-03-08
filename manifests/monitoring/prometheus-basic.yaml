@@ -1,0 +1,14 @@
+prometheusOperator:
+  admissionWebhooks:
+    enabled: false
+    failurePolicy: Ignore
+  tls:
+    enabled: false
+
+prometheus:
+  prometheusSpec:
+    serviceMonitorSelectorNilUsesHelmValues: false
+
+grafana:
+  enabled: true
+  adminPassword: "admin"

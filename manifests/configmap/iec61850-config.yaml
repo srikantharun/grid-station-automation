@@ -13,19 +13,43 @@ data:
   model.icd: |
     <?xml version="1.0" encoding="UTF-8"?>
     <SCL xmlns="http://www.iec.ch/61850/2003/SCL">
-      <Header id="Simple IED Model" version="1.0"/>
+      <Header id="Grid Station IED Model" version="1.0"/>
       <IED name="SIMULATOR">
         <AccessPoint name="AP1">
           <Server>
-            <LDevice inst="Simulated_Device">
+            <LDevice inst="GRID_STATION">
               <LN0 lnClass="LLN0" inst="">
                 <DataObject name="Mod" type="INC_1_Mod"/>
                 <DataObject name="Health" type="INS_1_Health"/>
               </LN0>
+              
+              <!-- Power Measurement -->
               <LN prefix="" lnClass="MMXU" inst="1">
                 <DataObject name="TotW" type="MV_1_TotW"/>
                 <DataObject name="TotVAr" type="MV_1_TotVAr"/>
                 <DataObject name="Hz" type="MV_1_Hz"/>
+                <DataObject name="PhV" type="MV_1_PhV"/>
+                <DataObject name="A" type="MV_1_A"/>
+                <DataObject name="PwrFact" type="MV_1_PwrFact"/>
+              </LN>
+              
+              <!-- Circuit Breaker -->
+              <LN prefix="" lnClass="XCBR" inst="1">
+                <DataObject name="Pos" type="DPS_1_Pos"/>
+                <DataObject name="OpCnt" type="INS_1_OpCnt"/>
+                <DataObject name="CBOpCap" type="INS_1_CBOpCap"/>
+              </LN>
+              
+              <!-- Temperature Monitoring -->
+              <LN prefix="" lnClass="STMP" inst="1">
+                <DataObject name="Tmp" type="MV_1_Tmp"/>
+                <DataObject name="TmpAlm" type="SPS_1_TmpAlm"/>
+              </LN>
+              
+              <!-- Power Quality Monitoring -->
+              <LN prefix="" lnClass="QFVR" inst="1">
+                <DataObject name="ThdPhV" type="MV_1_ThdPhV"/>
+                <DataObject name="Z" type="MV_1_Z"/>
               </LN>
             </LDevice>
           </Server>
