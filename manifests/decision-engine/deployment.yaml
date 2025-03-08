@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: decision-engine
+  namespace: grid-station
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: decision-engine
+  template:
+    metadata:
+      labels:
+        app: decision-engine
+    spec:
+      containers:
+      - name: decision-engine
+        image: python:3.9-slim
+        ports:
+        - containerPort: 8002
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            pip install requests pyyaml flask && 
+            mkdir -p /app &&
+            cp /scripts/engine.py /app/ &&
+            cp /scripts/safety_validator.py /app/ &&
+            cd /app &&
+            python engine.py
+        volumeMounts:
+        - name: config-volume
+          mountPath: /config
+        - name: actions-volume
+          mountPath: /actions
+        - name: scripts-volume
+          mountPath: /scripts
+        env:
+        - name: ML_SERVICE_URL
+          value: "http://ml-processing:8001/api/data"
+        - name: CONTROL_SERVICE_URL
+          value: "http://scada-interface:4840/control"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: config-volume
+        configMap:
+          name: decision-engine-config
+      - name: actions-volume
+        emptyDir: {}
+      - name: scripts-volume
+        configMap:
+          name: decision-engine-scripts
+

@@ -10,10 +10,18 @@ data:
     import json
     import time
     import threading
+    import logging
     from http.server import BaseHTTPRequestHandler, HTTPServer
     import opcua
     from opcua import ua
     from datetime import datetime
+
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    logger = logging.getLogger('scada-interface')
 
     # Global data storage for latest values
     latest_data = {
@@ -43,27 +51,152 @@ data:
         "timestamp": datetime.now().isoformat()
     }
 
-    # HTTP Handler to receive data from ML Processing
-    class DataReceiver(BaseHTTPRequestHandler):
-        def do_POST(self):
-            global latest_data
+    # Store control requests
+    control_actions = []
+
+    # Mock IEC61850 control functions
+    class Iec61850Controller:
+        """Simulates connection to IEC61850 simulator for control actions"""
+        def __init__(self):
+            self.simulator_address = os.environ.get('IEC61850_SIMULATOR_ADDRESS', 'ec61850-simulator')
+            logger.info(f"Initialized IEC61850 controller targeting {self.simulator_address}")
             
+        def send_control_command(self, action):
+            """Simulate sending command to IEC61850 device"""
+            logger.info(f"Sending control command to IEC61850 simulator: {action}")
+            
+            # In a real implementation, this would communicate with the IEC61850 device
+            # For demo, we'll just log the action and pretend it succeeded
+            action_type = action.get("type", "unknown")
+            action_target = action.get("target", "unknown")
+            
+            # Add to action history
+            control_actions.append({
+                "timestamp": datetime.now().isoformat(),
+                "action": action,
+                "status": "completed"
+            })
+            
+            # Based on action type, we would modify local values to simulate the effect
+            if action_type == "breaker_operations":
+                if action.get("action") == "open":
+                    latest_data["measurements"]["BreakerStatus"] = 0
+                    logger.info("Simulated breaker opening")
+                elif action.get("action") == "close":
+                    latest_data["measurements"]["BreakerStatus"] = 1
+                    logger.info("Simulated breaker closing")
+                    
+            elif action_type == "power_factor_correction":
+                # Simulate improving power factor
+                current_pf = latest_data["measurements"]["PowerFactor"]
+                new_pf = min(0.98, current_pf + 0.03)  # Improve by 0.03, max 0.98
+                latest_data["measurements"]["PowerFactor"] = new_pf
+                logger.info(f"Simulated power factor correction: {current_pf} -> {new_pf}")
+                
+            elif action_type == "voltage_regulation":
+                # Simulate voltage adjustment
+                current_voltage = latest_data["measurements"]["Voltage"]
+                if action.get("action") == "increase":
+                    new_voltage = current_voltage + float(action.get("value", 2.0))
+                    latest_data["measurements"]["Voltage"] = new_voltage
+                    logger.info(f"Simulated voltage increase: {current_voltage}V -> {new_voltage}V")
+                elif action.get("action") == "decrease":
+                    new_voltage = current_voltage - float(action.get("value", 2.0))
+                    latest_data["measurements"]["Voltage"] = new_voltage
+                    logger.info(f"Simulated voltage decrease: {current_voltage}V -> {new_voltage}V")
+                    
+            elif action_type == "frequency_stabilization":
+                # Simulate frequency adjustment
+                current_freq = latest_data["measurements"]["Hz"]
+                if action.get("action") == "increase_load":
+                    new_freq = current_freq - 0.05  # Move toward 50Hz
+                    latest_data["measurements"]["Hz"] = new_freq
+                    logger.info(f"Simulated frequency adjustment: {current_freq}Hz -> {new_freq}Hz")
+                elif action.get("action") == "decrease_load":
+                    new_freq = current_freq + 0.05  # Move toward 50Hz
+                    latest_data["measurements"]["Hz"] = new_freq
+                    logger.info(f"Simulated frequency adjustment: {current_freq}Hz -> {new_freq}Hz")
+                    
+            elif action_type == "load_reduction":
+                # Simulate load reduction
+                current_power = latest_data["measurements"]["TotW"]
+                reduction_percent = float(action.get("value", 10)) / 100.0
+                new_power = current_power * (1 - reduction_percent)
+                latest_data["measurements"]["TotW"] = new_power
+                logger.info(f"Simulated load reduction: {current_power}kW -> {new_power}kW")
+            
+            return True, "Action simulated successfully"
+
+    # Initialize the controller
+    iec61850_controller = Iec61850Controller()
+
+    # HTTP Handler to receive data from ML Processing
+    class RequestHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            """Handle GET requests for control history"""
+            if self.path == "/control/history":
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"history": control_actions}).encode())
+            else:
+                self.send_response(404)
+                self.end_headers()
+        
+        def do_POST(self):
+            """Handle POST requests for data or control"""
             if self.path == "/data":
+                # This is data from ML Processing
                 content_length = int(self.headers['Content-Length'])
                 post_data = self.rfile.read(content_length)
                 
                 try:
                     data = json.loads(post_data.decode('utf-8'))
+                    global latest_data
                     latest_data = data
-                    print(f"Received data update: {data['timestamp']}")
+                    logger.info(f"Received data update: {data['timestamp']}")
                     
                     self.send_response(200)
                     self.send_header('Content-type', 'application/json')
                     self.end_headers()
                     self.wfile.write(json.dumps({"status": "success"}).encode())
                 except Exception as e:
-                    print(f"Error processing data: {e}")
+                    logger.error(f"Error processing data: {e}")
                     self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode())
+            
+            elif self.path == "/control":
+                # This is a control action from decision engine
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                
+                try:
+                    action = json.loads(post_data.decode('utf-8'))
+                    logger.info(f"Received control action: {action}")
+                    
+                    # Validate action format
+                    if not action or "type" not in action:
+                        raise ValueError("Invalid action format")
+                    
+                    # Send control command to IEC61850
+                    success, message = iec61850_controller.send_control_command(action)
+                    
+                    if success:
+                        self.send_response(200)
+                        self.send_header('Content-type', 'application/json')
+                        self.end_headers()
+                        self.wfile.write(json.dumps({"status": "success", "message": message}).encode())
+                    else:
+                        self.send_response(400)
+                        self.send_header('Content-type', 'application/json')
+                        self.end_headers()
+                        self.wfile.write(json.dumps({"status": "error", "message": message}).encode())
+                    
+                except Exception as e:
+                    logger.error(f"Error processing control action: {e}")
+                    self.send_response(500)
                     self.send_header('Content-type', 'application/json')
                     self.end_headers()
                     self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode())
@@ -95,6 +228,7 @@ data:
             self.measurements = self.grid_station.add_folder(self.idx, "Measurements")
             self.analysis = self.grid_station.add_folder(self.idx, "Analysis")
             self.equipment = self.analysis.add_folder(self.idx, "Equipment")
+            self.control = self.grid_station.add_folder(self.idx, "Control")
             
             # Create variables for measurements
             self.var_totw = self.measurements.add_variable(self.idx, "TotalPower", 0.0)
@@ -118,17 +252,85 @@ data:
             self.var_breaker_health = self.equipment.add_variable(self.idx, "BreakerHealth", 100.0)
             self.var_line_health = self.equipment.add_variable(self.idx, "LineHealth", 100.0)
             
-            # Set variables to be writable if needed (e.g., for control)
-            self.var_breaker.set_writable()
+            # Control variables
+            self.var_breaker_control = self.control.add_variable(self.idx, "BreakerControl", False)
+            self.var_pf_control = self.control.add_variable(self.idx, "PowerFactorControl", 0.0)
+            self.var_voltage_control = self.control.add_variable(self.idx, "VoltageControl", 0.0)
+            
+            # Set variables to be writable for control
+            self.var_breaker_control.set_writable()
+            self.var_pf_control.set_writable()
+            self.var_voltage_control.set_writable()
+            
+            # Set up handlers for control variables
+            self.var_breaker_control.set_value_callback = self.on_breaker_control
+            self.var_pf_control.set_value_callback = self.on_pf_control
+            self.var_voltage_control.set_value_callback = self.on_voltage_control
             
             # Start the server
             self.server.start()
-            print(f"OPC UA Server started at {self.endpoint}")
+            logger.info(f"OPC UA Server started at {self.endpoint}")
             
             # Start update thread
             self.update_thread = threading.Thread(target=self.update_loop)
             self.update_thread.daemon = True
             self.update_thread.start()
+        
+        def on_breaker_control(self, value):
+            """Handle breaker control from OPC UA client"""
+            breaker_status = value
+            logger.info(f"OPC UA client requested breaker status change to: {breaker_status}")
+            
+            action = {
+                "type": "breaker_operations",
+                "action": "close" if breaker_status else "open",
+                "target": "main_breaker",
+                "source": "opcua_client"
+            }
+            
+            iec61850_controller.send_control_command(action)
+            return True
+            
+        def on_pf_control(self, value):
+            """Handle power factor control from OPC UA client"""
+            pf_setting = value
+            logger.info(f"OPC UA client requested power factor setting: {pf_setting}")
+            
+            action = {
+                "type": "power_factor_correction",
+                "target": "capacitor_bank",
+                "value": pf_setting,
+                "source": "opcua_client"
+            }
+            
+            iec61850_controller.send_control_command(action)
+            return True
+            
+        def on_voltage_control(self, value):
+            """Handle voltage control from OPC UA client"""
+            voltage_setting = value
+            current_voltage = latest_data["measurements"]["Voltage"]
+            logger.info(f"OPC UA client requested voltage setting: {voltage_setting}")
+            
+            if voltage_setting > current_voltage:
+                action = {
+                    "type": "voltage_regulation",
+                    "action": "increase",
+                    "target": "tap_changer",
+                    "value": voltage_setting - current_voltage,
+                    "source": "opcua_client"
+                }
+            else:
+                action = {
+                    "type": "voltage_regulation",
+                    "action": "decrease",
+                    "target": "tap_changer",
+                    "value": current_voltage - voltage_setting,
+                    "source": "opcua_client"
+                }
+            
+            iec61850_controller.send_control_command(action)
+            return True
         
         def update_loop(self):
             global latest_data
@@ -163,22 +365,22 @@ data:
                     self.var_line_health.set_value(equipment_health.get("line", 100))
                     
                 except Exception as e:
-                    print(f"Error updating OPC UA variables: {e}")
+                    logger.error(f"Error updating OPC UA variables: {e}")
                 
                 time.sleep(1)
         
         def stop(self):
             self.server.stop()
-            print("OPC UA Server stopped")
+            logger.info("OPC UA Server stopped")
 
     # Main function
     def main():
         # Start HTTP server in a separate thread
-        http_server = HTTPServer(('', 4840), DataReceiver)
+        http_server = HTTPServer(('', 4840), RequestHandler)
         http_thread = threading.Thread(target=http_server.serve_forever)
         http_thread.daemon = True
         http_thread.start()
-        print("HTTP Server started on port 4840")
+        logger.info("HTTP Server started on port 4840")
         
         # Start OPC UA server
         opcua_server = OpcUaServer()
@@ -188,10 +390,10 @@ data:
             while True:
                 time.sleep(1)
         except KeyboardInterrupt:
-            print("Shutting down servers...")
+            logger.info("Shutting down servers...")
             http_server.shutdown()
             opcua_server.stop()
-            print("Servers stopped")
+            logger.info("Servers stopped")
 
     if __name__ == "__main__":
         main()

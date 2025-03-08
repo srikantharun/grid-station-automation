@@ -1,0 +1,622 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: decision-engine-scripts
+  namespace: grid-station
+data:
+  engine.py: |
+    #!/usr/bin/env python3
+    import os
+    import yaml
+    import json
+    import time
+    import logging
+    import requests
+    import threading
+    import datetime
+    from flask import Flask, request, jsonify
+    from safety_validator import SafetyValidator
+
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    logger = logging.getLogger('decision-engine')
+
+    # Load configuration
+    def load_config():
+        try:
+            with open('/config/config.yaml', 'r') as file:
+                config = yaml.safe_load(file)
+            logger.info("Configuration loaded successfully")
+            return config
+        except Exception as e:
+            logger.error(f"Error loading configuration: {e}")
+            # Return default configuration if file cannot be loaded
+            return {
+                "general": {
+                    "log_level": "INFO",
+                    "check_interval_seconds": 10,
+                    "max_actions_per_check": 3
+                },
+                "safety_thresholds": {
+                    "frequency": {"min": 49.5, "max": 50.5},
+                    "voltage": {"min": 210, "max": 230},
+                    "transformer_temp": {"max": 80},
+                    "power_factor": {"min": 0.85}
+                },
+                "actions": {
+                    "power_factor_correction": {"enabled": True},
+                    "voltage_regulation": {"enabled": True},
+                    "frequency_stabilization": {"enabled": True},
+                    "breaker_operations": {"enabled": True},
+                    "load_balancing": {"enabled": True}
+                }
+            }
+
+    # Environment variables
+    ML_SERVICE_URL = os.environ.get('ML_SERVICE_URL', 'http://ml-processing:8001/api/data')
+    CONTROL_SERVICE_URL = os.environ.get('CONTROL_SERVICE_URL', 'http://scada-interface:4840/control')
+
+    # State storage
+    class StateManager:
+        def __init__(self):
+            self.current_state = {}
+            self.previous_states = []  # Keep history of states for trend analysis
+            self.max_history = 20
+            self.action_history = []
+            self.max_action_history = 100
+            self.action_cooldowns = {}  # Track when actions can be executed again
+
+        def update_state(self, new_state):
+            if self.current_state:  # If not empty
+                self.previous_states.append(self.current_state)
+                # Limit history size
+                if len(self.previous_states) > self.max_history:
+                    self.previous_states.pop(0)
+
+            self.current_state = new_state
+
+        def log_action(self, action):
+            action_record = {
+                "timestamp": datetime.datetime.now().isoformat(),
+                "action": action,
+                "state_before": self.current_state
+            }
+
+            # Set cooldown for this action type
+            action_type = action.get("type")
+            if action_type:
+                cooldown = config["actions"].get(action_type, {}).get("cooldown_seconds", 60)
+                self.action_cooldowns[action_type] = time.time() + cooldown
+
+            self.action_history.append(action_record)
+            if len(self.action_history) > self.max_action_history:
+                self.action_history.pop(0)
+
+            # Save to file for persistence
+            self.save_action_to_file(action_record)
+
+        def save_action_to_file(self, action_record):
+            try:
+                filename = f"/actions/action_{action_record['timestamp'].replace(':', '-')}.json"
+                with open(filename, 'w') as f:
+                    json.dump(action_record, f, indent=2)
+            except Exception as e:
+                logger.error(f"Error saving action to file: {e}")
+
+        def is_action_in_cooldown(self, action_type):
+            if action_type in self.action_cooldowns:
+                return time.time() < self.action_cooldowns[action_type]
+            return False
+
+        def get_trend(self, parameter, num_points=5):
+            """Calculate trend for a specific parameter over recent states"""
+            states_to_check = self.previous_states[-num_points:] if len(self.previous_states) >= num_points else self.previous_states
+
+            if not states_to_check or parameter not in self.current_state.get("readings", {}):
+                return 0
+
+            try:
+                current = self.current_state["readings"][parameter]
+                oldest = None
+
+                for state in states_to_check:
+                    if parameter in state.get("readings", {}):
+                        oldest = state["readings"][parameter]
+                        break
+
+                if oldest is not None:
+                    return (current - oldest) / len(states_to_check)
+                return 0
+            except (TypeError, KeyError):
+                return 0
+
+    # Initialize state manager
+    state_manager = StateManager()
+
+    # Initialize safety validator
+    safety_validator = None  # Will be initialized after config is loaded
+
+    # Decision engine class
+    class DecisionEngine:
+        def __init__(self, config, state_manager, safety_validator):
+            self.config = config
+            self.state_manager = state_manager
+            self.safety_validator = safety_validator
+
+        def fetch_current_data(self):
+            """Fetch the latest data from ML processing service"""
+            try:
+                response = requests.get(ML_SERVICE_URL, timeout=5)
+                if response.status_code == 200:
+                    data = response.json()
+                    self.state_manager.update_state(data)
+                    logger.debug("Updated state with latest data")
+                    return True
+                else:
+                    logger.warning(f"Error fetching data: HTTP {response.status_code}")
+                    return False
+            except Exception as e:
+                logger.error(f"Exception fetching data: {e}")
+                return False
+
+        def send_control_action(self, action):
+            """Send a control action to the SCADA interface"""
+            try:
+                # First validate the action for safety
+                is_safe, message = self.safety_validator.validate_action(action, self.state_manager.current_state)
+
+                if not is_safe:
+                    logger.warning(f"Action rejected by safety validator: {message}")
+                    return False, message
+
+                # Check if action type is in cooldown
+                if self.state_manager.is_action_in_cooldown(action.get("type")):
+                    logger.info(f"Action {action.get('type')} is in cooldown period, skipping")
+                    return False, "Action in cooldown period"
+
+                # Send action to SCADA interface
+                response = requests.post(
+                    CONTROL_SERVICE_URL,
+                    json=action,
+                    timeout=5
+                )
+
+                if response.status_code == 200:
+                    # Log the successful action
+                    self.state_manager.log_action(action)
+                    logger.info(f"Control action sent successfully: {action}")
+                    return True, "Action sent successfully"
+                else:
+                    logger.warning(f"Error sending control action: HTTP {response.status_code}")
+                    return False, f"HTTP error {response.status_code}"
+
+            except Exception as e:
+                logger.error(f"Exception sending control action: {e}")
+                return False, str(e)
+
+        def decide_actions(self):
+            """Main decision logic to determine what actions to take"""
+            if not self.state_manager.current_state:
+                logger.warning("No current state available, cannot make decisions")
+                return []
+
+            try:
+                readings = self.state_manager.current_state.get("readings", {})
+                analysis = self.state_manager.current_state.get("analysis", {})
+
+                # Check for emergency mode
+                emergency_mode = False
+                critical_issues = 0
+
+                # Count critical anomalies
+                for anomaly in analysis.get("anomalies", {}).values():
+                    if anomaly.get("severity") == "high":
+                        critical_issues += 1
+
+                # Check classifications for critical states
+                for classification in analysis.get("classifications", []):
+                    if classification.get("state") in ["alert", "critical", "unstable"]:
+                        critical_issues += 1
+
+                # Determine if we're in emergency mode
+                emergency_threshold = self.config["general"].get("emergency_mode_threshold", 2)
+                if critical_issues >= emergency_threshold:
+                    emergency_mode = True
+                    logger.warning(f"EMERGENCY MODE activated: {critical_issues} critical issues detected")
+
+                # List to collect actions
+                actions = []
+
+                # Check if breaker is open and needs attention first
+                if readings.get("BreakerStatus") == 0:
+                    if self.config["actions"]["breaker_operations"]["enabled"] and self.config["actions"]["breaker_operations"]["auto_reconnect"]:
+                        # Check if it's safe to close the breaker
+                        if self.is_safe_to_close_breaker(readings, analysis):
+                            actions.append({
+                                "type": "breaker_operations",
+                                "action": "close",
+                                "target": "main_breaker",
+                                "priority": "high"
+                            })
+
+                # Only proceed with other actions if breaker is closed
+                if readings.get("BreakerStatus") == 1:
+                    # Power factor correction
+                    if self.config["actions"]["power_factor_correction"]["enabled"]:
+                        power_factor = readings.get("PowerFactor", 1.0)
+                        pf_threshold = self.config["safety_thresholds"]["power_factor"]["min"]
+                        min_deviation = self.config["actions"]["power_factor_correction"]["min_deviation"]
+
+                        if power_factor < pf_threshold - min_deviation:
+                            actions.append({
+                                "type": "power_factor_correction",
+                                "target": "capacitor_bank",
+                                "value": self.calculate_capacitor_setting(power_factor, pf_threshold),
+                                "priority": "medium"
+                            })
+
+                    # Voltage regulation
+                    if self.config["actions"]["voltage_regulation"]["enabled"]:
+                        voltage = readings.get("Voltage", 220)
+                        v_min = self.config["safety_thresholds"]["voltage"]["min"]
+                        v_max = self.config["safety_thresholds"]["voltage"]["max"]
+                        min_deviation = self.config["actions"]["voltage_regulation"]["min_deviation_volts"]
+
+                        if voltage < v_min - min_deviation:
+                            actions.append({
+                                "type": "voltage_regulation",
+                                "target": "tap_changer",
+                                "action": "increase",
+                                "value": min(voltage - v_min + min_deviation,
+                                            self.config["actions"]["voltage_regulation"]["max_step_change"]),
+                                "priority": "high" if emergency_mode else "medium"
+                            })
+                        elif voltage > v_max + min_deviation:
+                            actions.append({
+                                "type": "voltage_regulation",
+                                "target": "tap_changer",
+                                "action": "decrease",
+                                "value": min(voltage - v_max - min_deviation,
+                                            self.config["actions"]["voltage_regulation"]["max_step_change"]),
+                                "priority": "high" if emergency_mode else "medium"
+                            })
+
+                    # Frequency stabilization
+                    if self.config["actions"]["frequency_stabilization"]["enabled"]:
+                        frequency = readings.get("Hz", 50.0)
+                        f_min = self.config["safety_thresholds"]["frequency"]["min"]
+                        f_max = self.config["safety_thresholds"]["frequency"]["max"]
+                        min_deviation = self.config["actions"]["frequency_stabilization"]["min_deviation_hz"]
+
+                        if abs(frequency - 50.0) > min_deviation:
+                            actions.append({
+                                "type": "frequency_stabilization",
+                                "target": "frequency_control",
+                                "action": "decrease_load" if frequency < 50.0 else "increase_load",
+                                "value": self.calculate_frequency_adjustment(frequency),
+                                "priority": "high"
+                            })
+
+                    # Transformer temperature management
+                    if readings.get("TransformerTemp", 0) > self.config["safety_thresholds"]["transformer_temp"]["max"]:
+                        actions.append({
+                            "type": "load_reduction",
+                            "target": "transformer",
+                            "action": "reduce_load",
+                            "value": 15,  # Reduce load by 15%
+                            "priority": "high"
+                        })
+
+                # Sort actions by priority
+                priority_values = {"high": 3, "medium": 2, "low": 1}
+                actions.sort(key=lambda x: priority_values.get(x.get("priority"), 0), reverse=True)
+
+                # Limit number of actions
+                max_actions = self.config["general"]["max_actions_per_check"]
+                if len(actions) > max_actions:
+                    actions = actions[:max_actions]
+
+                return actions
+
+            except Exception as e:
+                logger.error(f"Error in decide_actions: {e}")
+                return []
+
+        def is_safe_to_close_breaker(self, readings, analysis):
+            """Determine if it's safe to close the breaker"""
+            # Check for high temperature
+            if readings.get("TransformerTemp", 0) > self.config["safety_thresholds"]["transformer_temp"]["emergency_max"]:
+                return False
+
+            # Check for any critical anomalies
+            for anomaly in analysis.get("anomalies", {}).values():
+                if anomaly.get("severity") == "high":
+                    return False
+
+            # Otherwise it should be safe
+            return True
+
+        def calculate_capacitor_setting(self, current_pf, target_pf):
+            """Calculate optimal capacitor bank setting to correct power factor"""
+            # This is a simplified calculation
+            # In a real system, this would be more complex based on reactive power needs
+            correction_steps = self.config["actions"]["power_factor_correction"]["correction_steps"]
+            pf_difference = target_pf - current_pf
+
+            # Calculate a percentage of correction needed (0-100%)
+            correction_percentage = min(100, (pf_difference / target_pf) * 100 * correction_steps)
+            return max(0, round(correction_percentage))
+
+        def calculate_frequency_adjustment(self, current_frequency):
+            """Calculate the load adjustment needed to stabilize frequency"""
+            # Calculate how far we are from 50 Hz
+            frequency_error = 50.0 - current_frequency
+
+            # Scale the response based on the error
+            # This is a simplified calculation
+            max_response = self.config["actions"]["frequency_stabilization"]["max_response_kw"]
+            response = (frequency_error / 0.5) * max_response  # 0.5 Hz deviation = max response
+
+            # Limit the response to the configured maximum
+            return min(max_response, max(-max_response, response))
+
+        def check_and_act(self):
+            """Main loop function that checks data and takes actions"""
+            # Fetch latest data
+            success = self.fetch_current_data()
+            if not success:
+                logger.warning("Failed to fetch current data, skipping decision cycle")
+                return
+
+            # Decide what actions to take
+            actions = self.decide_actions()
+            logger.info(f"Decided on {len(actions)} potential actions")
+
+            # Execute actions
+            for action in actions:
+                success, message = self.send_control_action(action)
+                if success:
+                    logger.info(f"Executed action: {action['type']} - {message}")
+                else:
+                    logger.warning(f"Failed to execute action: {action['type']} - {message}")
+
+    # Create Flask app for API
+    app = Flask(__name__)
+
+    @app.route('/status', methods=['GET'])
+    def get_status():
+        """Return the current status of the decision engine"""
+        return jsonify({
+            "status": "running",
+            "current_state": state_manager.current_state,
+            "action_history": state_manager.action_history[-10:],  # Last 10 actions
+            "cooldowns": state_manager.action_cooldowns
+        })
+
+    @app.route('/actions', methods=['GET'])
+    def get_actions():
+        """Return the action history"""
+        limit = request.args.get('limit', default=10, type=int)
+        return jsonify({
+            "actions": state_manager.action_history[-limit:]
+        })
+
+    @app.route('/manual-action', methods=['POST'])
+    def manual_action():
+        """Endpoint for manually triggering an action"""
+        try:
+            action = request.json
+            if not action or "type" not in action:
+                return jsonify({"status": "error", "message": "Invalid action format"}), 400
+
+            # Execute the action
+            success, message = decision_engine.send_control_action(action)
+
+            if success:
+                return jsonify({"status": "success", "message": message})
+            else:
+                return jsonify({"status": "error", "message": message}), 400
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
+
+    # Main function
+    def main():
+        global config, safety_validator, decision_engine
+
+        # Load configuration
+        config = load_config()
+
+        # Update log level from config
+        log_level = getattr(logging, config["general"]["log_level"], logging.INFO)
+        logger.setLevel(log_level)
+
+        # Initialize safety validator with config
+        safety_validator = SafetyValidator(config)
+
+        # Initialize decision engine
+        decision_engine = DecisionEngine(config, state_manager, safety_validator)
+
+        # Start decision engine in a separate thread
+        def decision_loop():
+            while True:
+                try:
+                    decision_engine.check_and_act()
+                except Exception as e:
+                    logger.error(f"Error in decision loop: {e}")
+                time.sleep(config["general"]["check_interval_seconds"])
+
+        decision_thread = threading.Thread(target=decision_loop, daemon=True)
+        decision_thread.start()
+
+        # Start API server
+        logger.info("Starting decision engine API server")
+        app.run(host='0.0.0.0', port=8002)
+
+    if __name__ == "__main__":
+        main()
+
+  safety_validator.py: |
+    #!/usr/bin/env python3
+    import logging
+    from datetime import datetime, timedelta
+
+    logger = logging.getLogger('safety-validator')
+
+    class SafetyValidator:
+        def __init__(self, config):
+            self.config = config
+            self.safety_thresholds = config.get("safety_thresholds", {})
+            self.actions_config = config.get("actions", {})
+        
+            # Keep track of attempted actions for rate limiting
+            self.action_attempts = {}
+        
+        def validate_action(self, action, current_state):
+            """Validate if an action is safe to execute based on current state"""
+            if not action or "type" not in action:
+                return False, "Invalid action format"
+            
+            # Get current readings
+            readings = current_state.get("readings", {})
+            if not readings:
+                return False, "No current readings available"
+            
+            # Check for repeated actions (rate limiting)
+            action_type = action["type"]
+            action_target = action.get("target", "unknown")
+            action_key = f"{action_type}_{action_target}"
+        
+            current_time = datetime.now()
+            if action_key in self.action_attempts:
+                last_time, count = self.action_attempts[action_key]
+                # If last attempt was less than 10 seconds ago
+                if current_time - last_time < timedelta(seconds=10):
+                    # And we've had more than 3 attempts in the last minute
+                    if count > 3 and current_time - last_time < timedelta(minutes=1):
+                        return False, "Rate limited: too many attempts for this action"
+                    self.action_attempts[action_key] = (current_time, count + 1)
+                else:
+                    # Reset counter if more than 10 seconds have passed
+                    self.action_attempts[action_key] = (current_time, 1)
+            else:
+                self.action_attempts[action_key] = (current_time, 1)
+            
+            # Check based on action type
+            if action_type == "breaker_operations":
+                return self.validate_breaker_operation(action, readings)
+            elif action_type == "power_factor_correction":
+                return self.validate_power_factor_correction(action, readings)
+            elif action_type == "voltage_regulation":
+                return self.validate_voltage_regulation(action, readings)
+            elif action_type == "frequency_stabilization":
+                return self.validate_frequency_stabilization(action, readings)
+            elif action_type == "load_balancing":
+                return self.validate_load_balancing(action, readings)
+            elif action_type == "load_reduction":
+                return self.validate_load_reduction(action, readings)
+            else:
+                return False, f"Unknown action type: {action_type}"
+            
+        def validate_breaker_operation(self, action, readings):
+            """Validate breaker operations for safety"""
+            breaker_action = action.get("action")
+        
+            # Don't allow opening the breaker if it's already open
+            if breaker_action == "open" and readings.get("BreakerStatus") == 0:
+                return False, "Breaker is already open"
+            
+            # Don't allow closing the breaker if it's already closed
+            if breaker_action == "close" and readings.get("BreakerStatus") == 1:
+                return False, "Breaker is already closed"
+            
+            # Don't close breaker if transformer temperature is too high
+            if breaker_action == "close" and readings.get("TransformerTemp", 0) > self.safety_thresholds["transformer_temp"]["emergency_max"]:
+                return True, "Warning: Closing breaker with high transformer temperature"
+            
+            # Don't open breaker if power is too high (could cause surge elsewhere)
+            if breaker_action == "open" and readings.get("TotW", 0) > 800:
+                return False, "Cannot open breaker under high load conditions"
+            
+            return True, "Breaker operation validated"
+        
+        def validate_power_factor_correction(self, action, readings):
+            """Validate power factor correction actions"""
+            # Check if the current power factor is actually low
+            current_pf = readings.get("PowerFactor", 1.0)
+            min_pf = self.safety_thresholds["power_factor"]["min"]
+        
+            if current_pf >= min_pf:
+                return False, "Power factor is already within acceptable range"
+            
+            # Check if the correction value is reasonable
+            correction_value = action.get("value", 0)
+            if correction_value < 0 or correction_value > 100:
+                return False, "Correction value out of range (0-100)"
+            
+            return True, "Power factor correction validated"
+        
+        def validate_voltage_regulation(self, action, readings):
+            """Validate voltage regulation actions"""
+            voltage = readings.get("Voltage", 220)
+            regulation_action = action.get("action")
+            regulation_value = action.get("value", 0)
+        
+            # Check if the action matches the current voltage condition
+            if regulation_action == "increase" and voltage >= self.safety_thresholds["voltage"]["max"]:
+                return False, "Cannot increase voltage that is already at/above maximum"
+            
+            if regulation_action == "decrease" and voltage <= self.safety_thresholds["voltage"]["min"]:
+                return False, "Cannot decrease voltage that is already at/below minimum"
+            
+            # Check if the adjustment value is reasonable
+            max_step = self.actions_config["voltage_regulation"]["max_step_change"]
+            if abs(regulation_value) > max_step:
+                return False, f"Voltage adjustment too large (max {max_step}V)"
+            
+            return True, "Voltage regulation validated"
+        
+        def validate_frequency_stabilization(self, action, readings):
+            """Validate frequency stabilization actions"""
+            frequency = readings.get("Hz", 50.0)
+            stabilization_action = action.get("action")
+        
+            # Verify the action matches the frequency deviation
+            if stabilization_action == "increase_load" and frequency <= 50.0:
+                return False, "Cannot increase load when frequency is not above nominal"
+            
+            if stabilization_action == "decrease_load" and frequency >= 50.0:
+                return False, "Cannot decrease load when frequency is not below nominal"
+            
+            # Check if adjustment value is within limits
+            adjustment_value = abs(action.get("value", 0))
+            max_response = self.actions_config["frequency_stabilization"]["max_response_kw"]
+        
+            if adjustment_value > max_response:
+                return False, f"Frequency adjustment too large (max {max_response}kW)"
+            
+            return True, "Frequency stabilization validated"
+        
+        def validate_load_balancing(self, action, readings):
+            """Validate load balancing actions"""
+            # This would normally check line loading information
+            # Simplified validation for demo
+            adjustment_value = action.get("value", 0)
+            max_adjustment = self.actions_config["load_balancing"]["max_adjustment_percent"]
+        
+            if abs(adjustment_value) > max_adjustment:
+                return False, f"Load adjustment too large (max {max_adjustment}%)"
+            
+            return True, "Load balancing validated"
+        
+        def validate_load_reduction(self, action, readings):
+            """Validate load reduction actions"""
+            reduction_value = action.get("value", 0)
+        
+            # Ensure reduction is positive and not too extreme
+            if reduction_value <= 0 or reduction_value > 30:
+                return False, "Load reduction must be between 1-30%"
+            
+            return True, "Load reduction validated"

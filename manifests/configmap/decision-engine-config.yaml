@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: decision-engine-config
+  namespace: grid-station
+data:
+  config.yaml: |
+    # Decision Engine Configuration
+    general:
+      log_level: INFO
+      check_interval_seconds: 10
+      max_actions_per_check: 3
+      emergency_mode_threshold: 2  # Number of 'critical' alerts that trigger emergency mode
+      
+    # Safety thresholds for various parameters
+    safety_thresholds:
+      frequency:
+        min: 49.5
+        max: 50.5
+        emergency_min: 49.0
+        emergency_max: 51.0
+      voltage:
+        min: 210
+        max: 230
+        emergency_min: 200
+        emergency_max: 240
+      transformer_temp:
+        max: 80
+        emergency_max: 90
+      power_factor:
+        min: 0.85
+        emergency_min: 0.8
+        
+    # Corrective actions configuration
+    actions:
+      power_factor_correction:
+        enabled: true
+        min_deviation: 0.05  # Only correct if at least 5% below threshold
+        correction_steps: 3   # Number of steps to reach target
+        cooldown_seconds: 120  # Wait time between corrections
+        
+      voltage_regulation:
+        enabled: true
+        min_deviation_volts: 5
+        max_step_change: 2.5   # Maximum voltage change per step
+        cooldown_seconds: 60
+        
+      frequency_stabilization:
+        enabled: true
+        min_deviation_hz: 0.2
+        max_response_kw: 50   # Maximum power adjustment in kW
+        cooldown_seconds: 30
+        
+      breaker_operations:
+        enabled: true
+        auto_reconnect: true
+        min_reconnect_wait_seconds: 300
+        max_reconnect_attempts: 3
+        
+      load_balancing:
+        enabled: true
+        imbalance_threshold_percent: 20
+        max_adjustment_percent: 10
+        cooldown_seconds: 180
