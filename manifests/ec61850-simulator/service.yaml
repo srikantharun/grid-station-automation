@@ -3,10 +3,14 @@ kind: Service
 metadata:
   name: ec61850-simulator
   namespace: grid-station
+  labels:
+    app: ec61850-simulator
+    k8s-app: grid-station-metrics
 spec:
   selector:
     app: ec61850-simulator
   ports:
-  - port: 102
-    targetPort: 102
-  #clusterIP: 10.240.0.10
+  - name: metrics
+    port: 9100
+    targetPort: 9100
+  type: ClusterIP

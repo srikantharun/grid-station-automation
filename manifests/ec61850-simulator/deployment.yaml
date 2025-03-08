@@ -45,6 +45,7 @@ spec:
         args: ["pip install prometheus-client && python /scripts/exporter.py"]
         ports:
         - containerPort: 9100
+          name: metrics
         volumeMounts:
         - name: data-volume
           mountPath: /data
@@ -57,6 +58,18 @@ spec:
           limits:
             memory: "256Mi"
             cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: 10
+          periodSeconds: 5
       volumes:
       - name: config-volume
         configMap:

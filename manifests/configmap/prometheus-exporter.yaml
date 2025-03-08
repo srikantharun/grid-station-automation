@@ -4,7 +4,7 @@ metadata:
   name: prometheus-exporter
   namespace: grid-station
 data:
-  exporter.py: |
+  exporter.py: |    
     from prometheus_client import start_http_server, Gauge
     import time
     import csv
@@ -36,52 +36,47 @@ data:
         if not os.path.exists(datafile):
             log(f"Data file not found: {datafile}")
             return
-        
+    
         try:
             with open(datafile, "r") as f:
                 log(f"Reading data file: {datafile}")
-                csv_reader = csv.reader(f)
-                headers = next(csv_reader, None)
-            
-                if not headers:
-                    log("CSV file has no headers")
-                    return
-                
-                log(f"CSV headers: {headers}")
+                csv_reader = csv.DictReader(f)  # Use DictReader for more reliable column access
             
                 # Get all rows
                 rows = list(csv_reader)
                 if not rows:
                     log("CSV file has no data rows")
                     return
-                
-                # Get last line
-                last_line = rows[-1]
-                log(f"Processing last row: {last_line}")
             
-                # Parse values with explicit indices and error handling
+                # Get last line
+                last_row = rows[-1]
+                log(f"Processing last row: {dict(last_row)}")
+            
+                # Parse values with explicit column names and error handling
                 try:
-                    # Example format: timestamp,TotW,TotVAr,Hz,Voltage,Current,PowerFactor,BreakerStatus,TransformerTemp,LineImpedance,HarmonicDistortion
-                    TOTAL_POWER.set(float(last_line[1]))
-                    REACTIVE_POWER.set(float(last_line[2]))
-                    FREQUENCY.set(float(last_line[3]))
-                    VOLTAGE.set(float(last_line[4]))
-                    CURRENT.set(float(last_line[5]))
+                    if 'TotW' in last_row:
+                        TOTAL_POWER.set(float(last_row['TotW']))
+                    if 'TotVAr' in last_row:
+                        REACTIVE_POWER.set(float(last_row['TotVAr']))
+                    if 'Hz' in last_row:
+                        FREQUENCY.set(float(last_row['Hz']))
+                    if 'Voltage' in last_row:
+                        VOLTAGE.set(float(last_row['Voltage']))
+                    if 'Current' in last_row:
+                        CURRENT.set(float(last_row['Current']))
+                    if 'PowerFactor' in last_row:
+                        POWER_FACTOR.set(float(last_row['PowerFactor']))
+                    if 'BreakerStatus' in last_row:
+                        BREAKER_STATUS.set(int(last_row['BreakerStatus']))
+                    if 'TransformerTemp' in last_row:
+                        TRANSFORMER_TEMP.set(float(last_row['TransformerTemp']))
+                    if 'LineImpedance' in last_row:
+                        LINE_IMPEDANCE.set(float(last_row['LineImpedance']))
+                    if 'HarmonicDistortion' in last_row:
+                        HARMONIC_DISTORTION.set(float(last_row['HarmonicDistortion']))
                 
-                    # Additional metrics if available
-                    if len(last_line) > 6:
-                        POWER_FACTOR.set(float(last_line[6]))
-                    if len(last_line) > 7:
-                        BREAKER_STATUS.set(int(last_line[7]))
-                    if len(last_line) > 8:
-                        TRANSFORMER_TEMP.set(float(last_line[8]))
-                    if len(last_line) > 9:
-                        LINE_IMPEDANCE.set(float(last_line[9]))
-                    if len(last_line) > 10:
-                        HARMONIC_DISTORTION.set(float(last_line[10]))
-                
-                    log(f"Updated metrics with values: TotW={last_line[1]}, TotVAr={last_line[2]}, Hz={last_line[3]}, V={last_line[4]}, I={last_line[5]}")
-                except (IndexError, ValueError) as e:
+                    log("Successfully updated metrics with latest values")
+                except (ValueError, KeyError) as e:
                     log(f"Error parsing row values: {e}")
         except Exception as e:
             log(f"Error reading data file: {e}")
@@ -91,7 +86,7 @@ data:
             # Start up the server to expose the metrics
             start_http_server(9100)
             log("Prometheus exporter started on port 9100")
-        
+    
             # Update metrics every 5 seconds
             while True:
                 read_latest_data()

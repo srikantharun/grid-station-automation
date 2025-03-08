@@ -716,7 +716,9 @@ prometheusOperator:
 prometheus:
   prometheusSpec:
     serviceMonitorSelectorNilUsesHelmValues: false
-    serviceMonitorSelector: {}
+    serviceMonitorSelector: 
+      matchLabels:
+        release: prometheus
     serviceMonitorNamespaceSelector: {}
     podMonitorSelectorNilUsesHelmValues: false
     podMonitorSelector: {}
@@ -730,21 +732,7 @@ prometheus:
         cpu: "500m"
     retention: 15d
     additionalScrapeConfigs:
-      - job_name: 'grid-station-direct'
-        scrape_interval: 5s
-        kubernetes_sd_configs:
-          - role: pod
-            namespaces:
-              names:
-                - grid-station
-        relabel_configs:
-          - source_labels: [__meta_kubernetes_pod_label_app]
-            action: keep
-            regex: ec61850-simulator
-          - source_labels: [__meta_kubernetes_pod_container_port_number]
-            action: keep
-            regex: 9100
-      - job_name: 'grid-station'
+      - job_name: 'grid-station-metrics'
         scrape_interval: 5s
         kubernetes_sd_configs:
           - role: service
@@ -755,6 +743,9 @@ prometheus:
           - source_labels: [__meta_kubernetes_service_name]
             action: keep
             regex: prometheus-exporter
+          - source_labels: [__meta_kubernetes_service_port_name]
+            action: keep
+            regex: metrics
     scrapeInterval: "15s"
     evaluationInterval: "15s"
     enableAdminAPI: false
