@@ -9,6 +9,7 @@ spec:
   selector:
     matchLabels:
       app: ec61850-simulator
+      k8s-app: grid-station-metrics
   endpoints:
   - port: metrics
     interval: 15s

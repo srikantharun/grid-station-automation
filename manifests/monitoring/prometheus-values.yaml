@@ -217,7 +217,7 @@ grafana:
                     },
                     "editorMode": "code",
                     "expr": "grid_station_frequency",
-                    "legendFormat": "__auto",
+                    "legendFormat": "Grid Station Frequency",
                     "range": true,
                     "refId": "A"
                   }
@@ -527,7 +527,7 @@ grafana:
                     },
                     "editorMode": "code",
                     "expr": "100 * grid_station_power_factor",
-                    "legendFormat": "__auto",
+                    "legendFormat": "Grid Station Power Factor",
                     "range": true,
                     "refId": "A"
                   }
@@ -604,7 +604,7 @@ grafana:
                     },
                     "editorMode": "code",
                     "expr": "grid_station_breaker_status",
-                    "legendFormat": "__auto",
+                    "legendFormat": "Breaker Status",
                     "range": true,
                     "refId": "A"
                   }
@@ -677,7 +677,7 @@ grafana:
                     },
                     "editorMode": "code",
                     "expr": "grid_station_transformer_temp",
-                    "legendFormat": "__auto",
+                    "legendFormat": "Transformer Temperature",
                     "range": true,
                     "refId": "A"
                   }
@@ -753,7 +753,7 @@ prometheus:
     storageSpec:
       volumeClaimTemplate:
         spec:
-          storageClassName: standard
+          storageClassName: managed-premium
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
@@ -765,6 +765,7 @@ alertmanager:
     storage:
       volumeClaimTemplate:
         spec:
+          storageClassName: managed-premium
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
